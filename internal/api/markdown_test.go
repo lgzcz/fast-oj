@@ -67,6 +67,60 @@ func TestRenderMarkdownRefusesInjectedHTML(t *testing.T) {
 	}
 }
 
+func TestRenderMarkdownLuoguExtensions(t *testing.T) {
+	src := `::::info[外层标题]{open}
+外层
+
+:::success[内层]
+**内层内容**
+:::
+::::
+
+:::align{center}
+居中
+:::
+
+:::epigraph[——otto]
+引言
+:::
+
+::cute-table{tuack}
+| 名 | 值 |
+|----|----|
+| a  | 1  |
+
+- [ ] 未做
+- [x] 已做
+`
+	out := string(renderMarkdownHTML(src))
+	for _, want := range []string{
+		`<details class="md-box md-box-info" open><summary>外层标题</summary>`,
+		`<details class="md-box md-box-success"><summary>内层</summary>`,
+		`<strong>内层内容</strong>`,
+		`<div class="md-align md-align-center">`,
+		`<blockquote class="md-epigraph">`,
+		`<footer>——otto</footer>`,
+		`<div class="md-cute-table">`,
+		`<table>`,
+		`<li class="task-item"><input type="checkbox" disabled> 未做`,
+		`<li class="task-item"><input type="checkbox" disabled checked> 已做`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, ":::") {
+		t.Errorf("container fences leaked into HTML:\n%s", out)
+	}
+}
+
+func TestUnclosedContainerStaysText(t *testing.T) {
+	out := string(renderMarkdownHTML(":::info\n没有闭合\n"))
+	if !strings.Contains(out, ":::info") {
+		t.Errorf("unclosed container was consumed:\n%s", out)
+	}
+}
+
 func TestRenderMarkdownEmptyIsNothing(t *testing.T) {
 	if got := renderMarkdownHTML("   \n\t"); got != "" {
 		t.Fatalf("blank statement rendered %q", got)

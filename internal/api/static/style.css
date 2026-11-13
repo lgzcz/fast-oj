@@ -150,6 +150,24 @@ footer.top { max-width: 75rem; width: calc(100% - 3rem); margin: 0 auto; padding
 .status-untried { color: var(--muted); }
 .status-tried { color: var(--pt-orange); }
 .status-solved { color: var(--pt-green); }
+
+/* 洛谷扩展：折叠提示框、对齐块、引言、Tuack 表格与任务列表。 */
+.md-box { margin: .8em 0; border: 1px solid var(--line); border-left-width: 4px; border-radius: var(--radius); padding: .1em .8em; }
+.md-box summary { cursor: pointer; font-weight: 600; padding: .4em 0; }
+.md-box-body { padding-bottom: .4em; }
+.md-box-info { border-left-color: var(--pt-blue); }
+.md-box-success { border-left-color: var(--pt-green); }
+.md-box-warning { border-left-color: var(--pt-orange); }
+.md-box-error { border-left-color: var(--pt-red); }
+.md-align { margin: .8em 0; }
+.md-align-center { text-align: center; }
+.md-align-right { text-align: right; }
+.md-epigraph { margin: .8em 0; padding-left: 1em; border-left: 3px solid var(--line); color: var(--muted); }
+.md-epigraph footer { text-align: right; }
+.md-cute-table { margin: .8em 0; }
+.md-cute-table table { width: 100%; }
+.task-item { list-style: none; margin-left: -1.2em; }
+.task-item input[type="checkbox"] { margin-right: .4em; }
 .table-scroll { overflow-x: auto; margin: 1.25rem 0; scrollbar-width: thin; }
 table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: .875rem; }
 th, td { padding: .75rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
