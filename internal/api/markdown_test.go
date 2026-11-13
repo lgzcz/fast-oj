@@ -33,7 +33,10 @@ func dangerousStatement() string {
 	return "裸 HTML：<script>alert(1)</script>\n\n" +
 		"图片事件：<img src=x onerror=\"alert(2)\">\n\n" +
 		"伪协议：[点我](javascript:alert(3))\n\n" +
-		"数据协议：[文档](data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==)\n"
+		"数据协议：[文档](data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==)\n\n" +
+		"实体编码：[点我](&#106;avascript:alert(4))\n\n" +
+		"十六进制实体：[点我](&#x6a;avascript:alert(5))\n\n" +
+		"命名实体：[点我](javascript&colon;alert(6))\n"
 }
 
 func TestRenderMarkdownKeepsOJFeatures(t *testing.T) {
@@ -131,12 +134,19 @@ func TestRenderMarkdownEmptyIsNothing(t *testing.T) {
 }
 
 func TestSafeURLPolicy(t *testing.T) {
-	for _, bad := range []string{"javascript:alert(1)", "JavaScript:x", " data:text/html,x", "vbscript:y", "file:///c:/x", "about:blank", "blob:https://x/1"} {
+	for _, bad := range []string{
+		"javascript:alert(1)", "JavaScript:x", " data:text/html,x", "vbscript:y",
+		"file:///c:/x", "about:blank", "blob:https://x/1",
+		// 渲染器会先反转义实体再写 href；闸门必须看同一个形状。
+		"&#106;avascript:alert(1)", "&#x6a;avascript:alert(1)",
+		"javascript&colon;alert(1)", "jav&#x61;script:alert(1)",
+		"&#100;ata:text/html;base64,x",
+	} {
 		if safeURL([]byte(bad)) {
 			t.Errorf("%s must be refused", bad)
 		}
 	}
-	for _, good := range []string{"https://example.com", "http://a.b/c", "/relative/path", "./sibling", "#anchor", "mailto:a@b.c"} {
+	for _, good := range []string{"https://example.com", "http://a.b/c", "/relative/path", "./sibling", "../up", "#anchor", "mailto:a@b.c", "foo/bar", "?page=2", "//cdn.example/x"} {
 		if !safeURL([]byte(good)) {
 			t.Errorf("%s must be allowed", good)
 		}

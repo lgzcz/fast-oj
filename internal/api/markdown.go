@@ -1,7 +1,9 @@
 package api
 
 import (
+	stdhtml "html"
 	"html/template"
+	"net/url"
 	"strings"
 
 	"github.com/gomarkdown/markdown"
@@ -25,14 +27,29 @@ func newMarkdownParser() *parser.Parser {
 
 // safeURL blocks schemes a click could execute. Relative links and http(s),
 // which the renderer allows by default, stay usable.
+//
+// The check has to run on the same text the renderer writes into href: it calls
+// html.UnescapeString first, so `&#106;avascript:` would pass a raw prefix check
+// and then become javascript: in the browser. Unescape here for the same reason.
 func safeURL(raw []byte) bool {
-	s := strings.ToLower(strings.TrimSpace(string(raw)))
-	for _, bad := range []string{"javascript:", "data:", "vbscript:", "file:", "blob:", "about:"} {
-		if strings.HasPrefix(s, bad) {
-			return false
-		}
+	s := stdhtml.UnescapeString(strings.TrimSpace(string(raw)))
+	if s == "" {
+		return true
 	}
-	return true
+	u, err := url.Parse(s)
+	if err != nil {
+		return false
+	}
+	if u.Scheme == "" {
+		// Relative references ("foo/bar", "#anchor", "//host/path") carry no
+		// executable scheme of their own.
+		return true
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "http", "https", "mailto":
+		return true
+	}
+	return false
 }
 
 // renderMarkdownHTML takes a string so it can be used directly as a template
