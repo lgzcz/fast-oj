@@ -321,14 +321,40 @@ func TestListPagination(t *testing.T) {
 		t.Fatalf("page1 went past its limit:\n%s", page1)
 	}
 
-	_, page2 := h.htmlGet("/problems?limit=3&after=3", "")
+	_, page2 := h.htmlGet("/problems?limit=3&key=P03", "")
 	if !strings.Contains(page2, "P04") || strings.Contains(page2, "P03") {
 		t.Fatalf("page2:\n%s", page2)
 	}
 
-	_, last := h.htmlGet("/problems?limit=3&after=6", "")
+	_, last := h.htmlGet("/problems?limit=3&key=P06", "")
 	if !strings.Contains(last, "P07") || strings.Contains(last, "下一页") {
 		t.Fatalf("last page:\n%s", last)
+	}
+
+	// 编号降序：第一页倒着来，下一页链接带着同一个排序和新的锚点。
+	_, desc := h.htmlGet("/problems?limit=3&sort=pid_desc", "")
+	if !strings.Contains(desc, "P07") || !strings.Contains(desc, "sort=pid_desc") ||
+		strings.Contains(desc, "P04") {
+		t.Fatalf("pid desc page1:\n%s", desc)
+	}
+	_, desc2 := h.htmlGet("/problems?limit=3&sort=pid_desc&key=P05", "")
+	if !strings.Contains(desc2, "P04") || strings.Contains(desc2, "P05") {
+		t.Fatalf("pid desc page2:\n%s", desc2)
+	}
+
+	// 时间序：后建的题在前，游标走 id。
+	_, newest := h.htmlGet("/problems?limit=3&sort=time_desc", "")
+	for _, want := range []string{"P07", "P06", "P05"} {
+		if !strings.Contains(newest, want) {
+			t.Fatalf("time desc page1 missing %q:\n%s", want, newest)
+		}
+	}
+	if strings.Contains(newest, "P04") {
+		t.Fatalf("time desc page1 went past its limit:\n%s", newest)
+	}
+	_, older := h.htmlGet("/problems?limit=3&sort=time_desc&after=5", "")
+	if !strings.Contains(older, "P04") || strings.Contains(older, "P05") {
+		t.Fatalf("time desc page2:\n%s", older)
 	}
 
 	_, search := h.htmlGet("/problems?q=P05", "")

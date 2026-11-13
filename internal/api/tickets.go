@@ -183,7 +183,7 @@ func (s *Server) handleTicketNew(w http.ResponseWriter, r *http.Request) {
 // ticketFormFor fills the problem picker. A form that comes back after a rejected
 // post keeps what was typed; only the empty choices get defaults.
 func (s *Server) ticketFormFor(r *http.Request, d ticketFormData) (ticketFormData, error) {
-	bank, err := s.db.ListProblems(r.Context(), 0, 500, "", !s.canSeeHiddenProblems(r))
+	bank, err := s.db.ListProblems(r.Context(), store.ProblemCursor{}, 500, "", !s.canSeeHiddenProblems(r), store.ProblemSortPID)
 	if err != nil {
 		return d, err
 	}

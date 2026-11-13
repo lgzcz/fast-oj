@@ -115,23 +115,57 @@ func (db *DB) FindProblem(ctx context.Context, key string) (Problem, error) {
 		`SELECT `+problemColumns+` FROM problems WHERE pid=? COLLATE NOCASE`, key))
 }
 
+// ProblemSort 是题库列表的三条顺序：编号升序（默认）、编号降序、最新在前。
+// 时间序用自增 id 当游标：problems 只在这套代码里创建，id 的顺序就是创建顺序。
+type ProblemSort int
+
+const (
+	ProblemSortPID ProblemSort = iota
+	ProblemSortPIDDesc
+	ProblemSortTimeDesc
+)
+
+// ProblemCursor 是翻页锚点。编号序用 PID，时间序用 ID，两者只会有一个生效。
+type ProblemCursor struct {
+	ID  int64
+	PID string
+}
+
 type ProblemPage struct {
 	Items     []Problem `json:"items"`
 	NextAfter int64     `json:"next_after,omitempty"`
+	NextPID   string    `json:"next_pid,omitempty"`
 	Total     int       `json:"total"`
 }
 
-// ListProblems pages over the primary key with a cursor instead of OFFSET, so
-// deep pages keep the same cost as the first one.
-func (db *DB) ListProblems(ctx context.Context, after int64, limit int, search string, visibleOnly bool) (ProblemPage, error) {
+// ListProblems pages over the sort key with a cursor instead of OFFSET, so deep
+// pages keep the same cost as the first one.
+func (db *DB) ListProblems(ctx context.Context, cursor ProblemCursor, limit int, search string, visibleOnly bool, sort ProblemSort) (ProblemPage, error) {
 	if limit <= 0 {
 		limit = 50
 	}
 	if limit > 500 {
 		limit = 500
 	}
-	q := `SELECT ` + problemColumns + ` FROM problems WHERE id > ?`
-	args := []any{after}
+	q := `SELECT ` + problemColumns + ` FROM problems WHERE 1=1`
+	args := []any{}
+	switch sort {
+	case ProblemSortPIDDesc:
+		if cursor.PID != "" {
+			q += ` AND pid < ?`
+			args = append(args, cursor.PID)
+		}
+	case ProblemSortTimeDesc:
+		if cursor.ID > 0 {
+			q += ` AND id < ?`
+			args = append(args, cursor.ID)
+		}
+	default:
+		if cursor.PID != "" {
+			q += ` AND pid > ?`
+			args = append(args, cursor.PID)
+		}
+	}
 	if visibleOnly {
 		q += ` AND visible=1`
 	}
@@ -140,7 +174,15 @@ func (db *DB) ListProblems(ctx context.Context, after int64, limit int, search s
 		q += ` AND (pid LIKE ? ESCAPE '\' OR title LIKE ? ESCAPE '\')`
 		args = append(args, like, like)
 	}
-	q += ` ORDER BY id LIMIT ?`
+	switch sort {
+	case ProblemSortPIDDesc:
+		q += ` ORDER BY pid DESC`
+	case ProblemSortTimeDesc:
+		q += ` ORDER BY id DESC`
+	default:
+		q += ` ORDER BY pid ASC`
+	}
+	q += ` LIMIT ?`
 	args = append(args, limit+1)
 
 	rows, err := db.SQL.QueryContext(ctx, q, args...)
@@ -161,7 +203,12 @@ func (db *DB) ListProblems(ctx context.Context, after int64, limit int, search s
 		return page, err
 	}
 	if len(page.Items) > limit {
-		page.NextAfter = page.Items[limit-1].ID
+		last := page.Items[limit-1]
+		if sort == ProblemSortTimeDesc {
+			page.NextAfter = last.ID
+		} else {
+			page.NextPID = last.PID
+		}
 		page.Items = page.Items[:limit]
 	}
 

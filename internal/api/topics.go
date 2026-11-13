@@ -268,7 +268,7 @@ func (s *Server) topicFormFor(r *http.Request, a actor, problemKey string) (topi
 			d.Kind, d.Problem, d.LockedProblem = store.TopicHelp, p.PID, true
 		}
 	}
-	bank, err := s.db.ListProblems(r.Context(), 0, 500, "", !s.canSeeHiddenProblems(r))
+	bank, err := s.db.ListProblems(r.Context(), store.ProblemCursor{}, 500, "", !s.canSeeHiddenProblems(r), store.ProblemSortPID)
 	if err != nil {
 		return d, err
 	}
@@ -299,7 +299,7 @@ func (s *Server) handleTopicCreate(w http.ResponseWriter, r *http.Request) {
 	// The form is redrawn from what was posted, so an unresolvable problem key stays
 	// on the page as the error parseTopicForm reported instead of failing here.
 	d := topicFormData{Action: "/topics", Kind: f.Kind, LockedProblem: r.FormValue("locked") == "1"}
-	bank, err := s.db.ListProblems(r.Context(), 0, 500, "", !a.can(permProblemEditAny))
+	bank, err := s.db.ListProblems(r.Context(), store.ProblemCursor{}, 500, "", !a.can(permProblemEditAny), store.ProblemSortPID)
 	if err != nil {
 		s.writeStoreError(w, r, err)
 		return

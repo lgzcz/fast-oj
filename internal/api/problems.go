@@ -34,15 +34,30 @@ func validLanguageTag(s string) bool {
 
 func (s *Server) handleProblemList(w http.ResponseWriter, r *http.Request) {
 	a, _ := s.authenticate(r)
-	after, _ := strconv.ParseInt(r.URL.Query().Get("after"), 10, 64)
-	limit := pageLimit(r.URL.Query().Get("limit"))
-	search := r.URL.Query().Get("q")
-	page, err := s.db.ListProblems(r.Context(), after, limit, search, !a.can(permProblemEditAny))
+	q := r.URL.Query()
+	after, _ := strconv.ParseInt(q.Get("after"), 10, 64)
+	limit := pageLimit(q.Get("limit"))
+	search := q.Get("q")
+	sort, sortKey := problemSortOf(q.Get("sort"))
+	cursor := store.ProblemCursor{ID: after, PID: q.Get("key")}
+	page, err := s.db.ListProblems(r.Context(), cursor, limit, search, !a.can(permProblemEditAny), sort)
 	if err != nil {
 		s.writeStoreError(w, r, err)
 		return
 	}
-	s.problemsPage(w, r, a.viewer(), page, limit, search)
+	s.problemsPage(w, r, a.viewer(), page, limit, search, sortKey)
+}
+
+// problemSortOf 把 URL 里的排序名翻成数据库用的枚举。认不出来就回到默认的编号升序，
+// 不把一条手写的链接变成 400。
+func problemSortOf(raw string) (store.ProblemSort, string) {
+	switch raw {
+	case "pid_desc":
+		return store.ProblemSortPIDDesc, "pid_desc"
+	case "time_desc":
+		return store.ProblemSortTimeDesc, "time_desc"
+	}
+	return store.ProblemSortPID, "pid_asc"
 }
 
 func (s *Server) handleProblemGet(w http.ResponseWriter, r *http.Request) {

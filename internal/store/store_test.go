@@ -124,30 +124,38 @@ func TestProblemLifecycle(t *testing.T) {
 	mustProblem(t, db, "P101", "Sum")
 	mustProblem(t, db, "P102", "Difference")
 
-	page, err := db.ListProblems(ctx, 0, 2, "", true)
+	page, err := db.ListProblems(ctx, ProblemCursor{}, 2, "", true, ProblemSortPID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(page.Items) != 2 || page.NextAfter != 2 || page.Total != 3 {
+	if len(page.Items) != 2 || page.NextPID != "P101" || page.Total != 3 {
 		t.Fatalf("first page = %+v", page)
 	}
-	second, err := db.ListProblems(ctx, page.NextAfter, 2, "", true)
+	second, err := db.ListProblems(ctx, ProblemCursor{PID: page.NextPID}, 2, "", true, ProblemSortPID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(second.Items) != 1 || second.NextAfter != 0 {
+	if len(second.Items) != 1 || second.NextPID != "" {
 		t.Fatalf("second page = %+v", second)
+	}
+	desc, err := db.ListProblems(ctx, ProblemCursor{}, 1, "", true, ProblemSortPIDDesc)
+	if err != nil || len(desc.Items) != 1 || desc.Items[0].PID != "P102" {
+		t.Fatalf("pid desc = %+v %v", desc, err)
+	}
+	newest, err := db.ListProblems(ctx, ProblemCursor{}, 1, "", true, ProblemSortTimeDesc)
+	if err != nil || len(newest.Items) != 1 || newest.Items[0].PID != "P102" {
+		t.Fatalf("time desc = %+v %v", newest, err)
 	}
 
 	// A literal percent must not act as a wildcard.
-	hits, err := db.ListProblems(ctx, 0, 50, "100", true)
+	hits, err := db.ListProblems(ctx, ProblemCursor{}, 50, "100", true, ProblemSortPID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(hits.Items) != 1 {
 		t.Fatalf("pid search = %+v, want exactly 1", hits.Items)
 	}
-	esc, err := db.ListProblems(ctx, 0, 50, "%", true)
+	esc, err := db.ListProblems(ctx, ProblemCursor{}, 50, "%", true, ProblemSortPID)
 	if err != nil {
 		t.Fatal(err)
 	}

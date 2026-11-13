@@ -139,7 +139,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a, _ := s.authenticate(r)
-	problems, err := s.db.ListProblems(r.Context(), 0, 6, "", !a.can(permProblemEditAny))
+	problems, err := s.db.ListProblems(r.Context(), store.ProblemCursor{}, 6, "", !a.can(permProblemEditAny), store.ProblemSortTimeDesc)
 	if err != nil {
 		s.writeStoreError(w, r, err)
 		return

@@ -522,7 +522,7 @@ func (s *Server) contestEditData(r *http.Request, c store.Contest) (contestData,
 	}
 	d.MemberCount = len(members)
 	a, _ := s.authenticate(r)
-	bank, err := s.db.ListProblems(r.Context(), 0, 500, "", !a.can(permProblemEditAny))
+	bank, err := s.db.ListProblems(r.Context(), store.ProblemCursor{}, 500, "", !a.can(permProblemEditAny), store.ProblemSortPID)
 	if err != nil {
 		return d, err
 	}

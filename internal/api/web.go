@@ -159,10 +159,14 @@ type problemsData struct {
 	Total int
 	Limit int
 	Next  int64
-	Query string
+	// NextKey 是编号序的翻页锚点；时间序仍用 Next（id）。Sort 是当前选中的顺序，
+	// 下一页链接必须把它带上，否则翻一页就悄悄换回默认排序。
+	NextKey string
+	Sort    string
+	Query   string
 }
 
-func (s *Server) problemsPage(w http.ResponseWriter, r *http.Request, me *viewer, page store.ProblemPage, limit int, search string) {
+func (s *Server) problemsPage(w http.ResponseWriter, r *http.Request, me *viewer, page store.ProblemPage, limit int, search, sort string) {
 	ids := make([]int64, len(page.Items))
 	for i, p := range page.Items {
 		ids[i] = p.ID
@@ -189,7 +193,8 @@ func (s *Server) problemsPage(w http.ResponseWriter, r *http.Request, me *viewer
 		})
 	}
 	s.page(w, r, http.StatusOK, "题库", "problems", me, msgOf(r), problemsData{
-		Items: rows, Total: page.Total, Limit: limit, Next: page.NextAfter, Query: search,
+		Items: rows, Total: page.Total, Limit: limit, Next: page.NextAfter,
+		NextKey: url.QueryEscape(page.NextPID), Sort: sort, Query: search,
 	})
 }
 
