@@ -144,6 +144,27 @@ func (e *env) process(t *testing.T) (bool, error) {
 	return e.agent.ProcessOnce(context.Background())
 }
 
+func TestNewMakesWorkDirAbsolute(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rel, err := filepath.Rel(wd, filepath.Join(t.TempDir(), "work"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := New(Config{
+		Server: "http://127.0.0.1:1", Token: "t", Name: "box", Dir: rel,
+		Tools: map[string]judge.Tool{"cpp": {Language: "cpp"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !filepath.IsAbs(a.Dir()) {
+		t.Fatalf("work dir stayed relative: %q", a.Dir())
+	}
+}
+
 func TestEndToEndAccepted(t *testing.T) {
 	e := newEnv(t)
 	sub := e.seedProblem(t, sumSource, "cpp")

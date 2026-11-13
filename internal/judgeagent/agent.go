@@ -83,6 +83,12 @@ func New(cfg Config) (*Agent, error) {
 		}
 		cfg.Dir = filepath.Join(base, "fast-oj-judge")
 	}
+	// Work directories are handed to the child as TEMP/TMP/HOME while its cwd is
+	// already that directory. A relative -dir would then be resolved twice
+	// ("work/2/user/work/2/user") and the compiler cannot create its temp files.
+	if abs, err := filepath.Abs(cfg.Dir); err == nil {
+		cfg.Dir = abs
+	}
 	if cfg.Logf == nil {
 		cfg.Logf = func(string, ...any) {}
 	}
