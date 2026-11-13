@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -299,6 +300,54 @@ func TestDetailLevelGradesTheSubmissionPage(t *testing.T) {
 	// An anonymous reader never gets the code, at any level.
 	if _, anon := h.htmlGet(page, ""); strings.Contains(anon, "int main()") {
 		t.Fatal("the source leaked to an anonymous reader")
+	}
+}
+
+func TestSubmissionLiveFragment(t *testing.T) {
+	h := newHarness(t)
+	h.readyProblem("P2100")
+	author := h.signIn("live_user")
+	if code, body := h.submitCode(author, "P2100", "cpp", "int main(){}"); code != http.StatusOK {
+		t.Fatalf("submit = %d %q", code, body)
+	}
+	var id int64
+	if err := h.db.SQL.QueryRowContext(ctx(), `SELECT id FROM submissions ORDER BY id DESC LIMIT 1`).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	path := fmt.Sprintf("/submissions/%d", id)
+
+	_, page := h.getAs(author, path)
+	if !strings.Contains(page, `id="submission-live"`) || !strings.Contains(page, `data-inflight="true"`) {
+		t.Fatalf("detail page is not marked in flight:\n%s", short(page))
+	}
+	if !strings.Contains(page, fmt.Sprintf("/submissions/%d/live", id)) {
+		t.Fatalf("detail page does not poll the live fragment:\n%s", short(page))
+	}
+
+	code, frag := h.getAs(author, path+"/live")
+	if code != http.StatusOK || !strings.Contains(frag, `<div id="submission-live"`) || strings.Contains(frag, "<html") {
+		t.Fatalf("live fragment = %d:\n%s", code, short(frag))
+	}
+	if !strings.Contains(frag, `data-inflight="true"`) {
+		t.Fatalf("live fragment lost the in-flight marker:\n%s", short(frag))
+	}
+
+	h.finishSubmission(id, store.Result{Verdict: "AC", TimeMS: 1, MemKB: 1, Score: 1, TotalScore: 1}, nil)
+	_, done := h.getAs(author, path+"/live")
+	if !strings.Contains(done, `data-status="done"`) || !strings.Contains(done, "通过") {
+		t.Fatalf("finished fragment not final:\n%s", short(done))
+	}
+
+	// 局部刷新不能成为绕过可见性规则的入口：题目转隐藏之后，陌生人连这一块也读不到。
+	if _, err := h.db.SQL.ExecContext(ctx(), `UPDATE problems SET visible=0 WHERE pid='P2100'`); err != nil {
+		t.Fatal(err)
+	}
+	stranger := h.signIn("live_stranger")
+	if code, _ := h.getAs(stranger, path+"/live"); code != http.StatusNotFound {
+		t.Fatalf("stranger read live fragment = %d", code)
+	}
+	if code, _ := h.getAs(author, path+"/live"); code != http.StatusOK {
+		t.Fatalf("author lost the live fragment after hiding the problem = %d", code)
 	}
 }
 

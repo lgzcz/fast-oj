@@ -100,52 +100,90 @@ func gradeDetail(level string) detailView {
 	return view
 }
 
-func (s *Server) handleSubmitGet(w http.ResponseWriter, r *http.Request) {
-	a, _ := s.authenticate(r)
+type submissionRead struct {
+	d              store.SubmissionDetail
+	view           detailView
+	source, detail string
+	runs           []store.Run
+}
+
+// loadSubmission resolves one row and exactly the parts this reader may see.
+// withSource is false for the live fragment: that endpoint is polled every
+// second and has no source section, so dragging the program text through SQLite
+// would be pure waste.
+func (s *Server) loadSubmission(w http.ResponseWriter, r *http.Request, a actor, withSource bool) (submissionRead, bool) {
+	var out submissionRead
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id <= 0 {
 		s.respondError(w, r, http.StatusBadRequest, "submission id must be a positive number")
-		return
+		return out, false
 	}
 	d, err := s.db.SubmissionDetail(r.Context(), id)
 	if err != nil {
 		s.writeStoreError(w, r, err)
-		return
+		return out, false
 	}
 	if !canReadSubmission(a, d) {
 		// 不存在、隐藏题的别人提交、以及进行中 OI 的别人成绩，对外是同一个答案：
 		// 别用存在性给攻击者当探针。
 		s.respondError(w, r, http.StatusNotFound, "没有这条提交")
+		return out, false
+	}
+	out.d, out.view = d, submissionView(a, d)
+	if withSource && out.view.Source {
+		out.source, out.detail, err = s.db.SubmissionPayload(r.Context(), d.ID)
+		if err != nil {
+			s.writeStoreError(w, r, err)
+			return out, false
+		}
+		if !out.view.Diff {
+			out.detail = ""
+		}
+		out.d.Source, out.d.Detail = out.source, out.detail
+	} else if out.view.Diff {
+		out.detail, err = s.db.SubmissionDetailText(r.Context(), d.ID)
+		if err != nil {
+			s.writeStoreError(w, r, err)
+			return out, false
+		}
+		out.d.Detail = out.detail
+	}
+	if out.view.Runs {
+		out.runs, err = s.db.ListRuns(r.Context(), d.ID)
+		if err != nil {
+			s.writeStoreError(w, r, err)
+			return out, false
+		}
+	}
+	return out, true
+}
+
+func (s *Server) handleSubmitGet(w http.ResponseWriter, r *http.Request) {
+	a, _ := s.authenticate(r)
+	sub, ok := s.loadSubmission(w, r, a, true)
+	if !ok {
 		return
 	}
+	s.submissionPage(w, r, a, sub.d, sub.view, sub.source, sub.detail, sub.runs)
+}
 
-	view := submissionView(a, d)
-	var runs []store.Run
-	var source, detail string
-	if view.Runs || view.Source {
-		// Source and judge detail stay out of the joined list view; they are
-		// loaded only for the one row someone is allowed to read.
-		source, detail, err = s.db.SubmissionPayload(r.Context(), d.ID)
-		if err != nil {
-			s.writeStoreError(w, r, err)
-			return
-		}
-		if !view.Source {
-			source = ""
-		}
-		if !view.Diff {
-			detail = ""
-		}
-		d.Source, d.Detail = source, detail
+// handleSubmitLive is the fragment the detail page polls while a submission is
+// in flight. It renders the same "submission_live" block the full page uses, so
+// the two cannot drift.
+func (s *Server) handleSubmitLive(w http.ResponseWriter, r *http.Request) {
+	a, _ := s.authenticate(r)
+	sub, ok := s.loadSubmission(w, r, a, false)
+	if !ok {
+		return
 	}
-	if view.Runs {
-		runs, err = s.db.ListRuns(r.Context(), d.ID)
-		if err != nil {
-			s.writeStoreError(w, r, err)
-			return
-		}
+	data := submissionViewData(a, sub.d, sub.view, sub.source, sub.detail, sub.runs)
+	w.Header().Set("Cache-Control", "no-store")
+	if err := views.renderFragment(w, "submission", "submission_live", shell{
+		Site: s.site(r.Context()), Me: a.viewer(), Data: data,
+	}); err != nil {
+		s.log.Error("template", "fragment", "submission_live", "err", err)
+		s.respondError(w, r, http.StatusInternalServerError, "page rendering failed")
 	}
-	s.submissionPage(w, r, a, d, view, source, detail, runs)
 }
 
 func ago(ms int64) string {

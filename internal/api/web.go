@@ -500,6 +500,9 @@ type submissionData struct {
 	Class     string
 	Outcome   string
 	Headline  string
+	// Status is the raw state machine value; the live fragment carries it in a
+	// data attribute so the poller knows when to stop.
+	Status    string
 	Time      string
 	Mem       string
 	Score     string
@@ -525,6 +528,13 @@ type submissionData struct {
 }
 
 func (s *Server) submissionPage(w http.ResponseWriter, r *http.Request, a actor, d store.SubmissionDetail, view detailView, source, detail string, runs []store.Run) {
+	s.page(w, r, http.StatusOK, fmt.Sprintf("提交 #%d", d.ID), "submission", a.viewer(), msgOf(r),
+		submissionViewData(a, d, view, source, detail, runs))
+}
+
+// submissionViewData is shared by the full page and the live fragment so the
+// polled rows and the initially rendered rows are the same object.
+func submissionViewData(a actor, d store.SubmissionDetail, view detailView, source, detail string, runs []store.Run) submissionData {
 	class, outcome := outcomeOf(d.Status, d.Verdict)
 	score := "-"
 	if d.TotalScore > 0 {
@@ -567,11 +577,11 @@ func (s *Server) submissionPage(w http.ResponseWriter, r *http.Request, a actor,
 
 	// 重判之后那一句"已退回队列"要在这页上说到——它是从本页按下去的，绕到列表页去报信
 	// 等于让人再点一次返回。
-	s.page(w, r, http.StatusOK, fmt.Sprintf("提交 #%d", d.ID), "submission", a.viewer(), msgOf(r), submissionData{
+	return submissionData{
 		ID: d.ID, Handle: d.Handle, Name: personName(d.Name, d.Handle), NameColor: d.Color,
 		PID: d.PID, Title: d.Title,
 		Language: d.Language, Version: toolchainCell(d.Language, d.Toolchain, d.Options),
-		Class: class, Outcome: outcome, Headline: headline,
+		Class: class, Outcome: outcome, Headline: headline, Status: d.Status,
 		Time: formatMS(d.TimeMS, d.TimeMin), Mem: formatKB(d.MemKB, d.MemMin), Score: score,
 		Failed: orDash(d.FailedCase), JudgeName: judgeName,
 		Created: agoMS(d.CreatedAt), Judged: agoMS(d.JudgedAt),
@@ -583,7 +593,7 @@ func (s *Server) submissionPage(w http.ResponseWriter, r *http.Request, a actor,
 		Partial:    !(view.Runs && view.Perf && view.Diff && view.Judge && view.Source),
 		Waiting:    judge.Status(d.Status).InFlight(),
 		CanRejudge: a.can(permRejudge) && d.Status != string(judge.Queued),
-	})
+	}
 }
 
 func verdictSentence(v string) string {

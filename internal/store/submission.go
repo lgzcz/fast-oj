@@ -47,6 +47,15 @@ func (db *DB) SubmissionPayload(ctx context.Context, id int64) (source, detail s
 	return source, detail, notFound(err)
 }
 
+// SubmissionDetailText is the detail column alone. The live-fragment endpoint
+// polls this while a submission is judged; reading the source on every poll would
+// drag the whole program through SQLite for a section the fragment never shows.
+func (db *DB) SubmissionDetailText(ctx context.Context, id int64) (string, error) {
+	var detail string
+	err := db.SQL.QueryRowContext(ctx, `SELECT detail FROM submissions WHERE id=?`, id).Scan(&detail)
+	return detail, notFound(err)
+}
+
 type SubmissionFilter struct {
 	UserID    int64
 	ProblemID int64

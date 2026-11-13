@@ -9,6 +9,44 @@
   {{if .Data.ContestGone}}· <span class="muted">比赛已删除（记录保留）</span>{{end}}
 </p>
 
+{{template "submission_live" .}}
+
+{{if .Data.View.Source}}
+  {{if .Data.Source}}
+  <h2>源码</h2>
+  <pre><code>{{.Data.Source}}</code></pre>
+  {{end}}
+{{else}}
+  <p class="meta">源码与判题明细只对本人、出题人和管理员可见。<a href="/login?next=/submissions/{{.Data.ID}}">登录</a></p>
+{{end}}
+
+{{if .Data.Partial}}<p class="meta">这道题设置了判题详情级别，更细的部分只对出题人与管理员开放。</p>{{end}}
+
+{{if .Data.Waiting}}<noscript><meta http-equiv="refresh" content="2"></noscript>{{end}}
+{{if .Data.Waiting}}
+<script>
+(function () {
+  function tick() {
+    var cur = document.getElementById('submission-live');
+    if (!cur || cur.dataset.inflight !== 'true') return;
+    fetch('/submissions/{{.Data.ID}}/live', {headers: {'Accept': 'text/html'}, cache: 'no-store'})
+      .then(function (res) { if (!res.ok) throw new Error(String(res.status)); return res.text(); })
+      .then(function (html) {
+        var next = new DOMParser().parseFromString(html, 'text/html').getElementById('submission-live');
+        if (!next) return;
+        cur.replaceWith(next);
+        if (next.dataset.inflight === 'true') setTimeout(tick, 1200);
+      })
+      .catch(function () { setTimeout(tick, 3000); });
+  }
+  setTimeout(tick, 800);
+})();
+</script>
+{{end}}
+{{end}}
+
+{{define "submission_live"}}
+<div id="submission-live" data-status="{{.Data.Status}}" data-inflight="{{if .Data.Waiting}}true{{else}}false{{end}}">
 <h2 class="{{.Data.Class}}">{{.Data.Headline}}</h2>
 
 <div class="table-scroll" role="region" aria-label="数据表格" tabindex="0">
@@ -64,17 +102,6 @@
   <pre>{{.Data.Detail}}</pre>
 {{end}}
 
-{{if .Data.View.Source}}
-  {{if .Data.Source}}
-  <h2>源码</h2>
-  <pre><code>{{.Data.Source}}</code></pre>
-  {{end}}
-{{else}}
-  <p class="meta">源码与判题明细只对本人、出题人和管理员可见。<a href="/login?next=/submissions/{{.Data.ID}}">登录</a></p>
-{{end}}
-
-{{if .Data.Partial}}<p class="meta">这道题设置了判题详情级别，更细的部分只对出题人与管理员开放。</p>{{end}}
-
-{{if .Data.Waiting}}<p class="meta">判题中 —— 本页会自动刷新，每判完一个用例就多出一行。</p>{{end}}
-{{if .Data.Waiting}}<meta http-equiv="refresh" content="2">{{end}}
+{{if .Data.Waiting}}<p class="meta">判题中 —— 逐用例会自己出现，不用刷新页面。</p>{{end}}
+</div>
 {{end}}

@@ -176,6 +176,23 @@ func (v *viewEngine) render(w http.ResponseWriter, status int, page string, data
 	return err
 }
 
+// renderFragment executes one named block from a page template set. The live
+// submission endpoint uses it so the polling response is produced by the same
+// template as the full page, not by a second hand-written copy of the table.
+func (v *viewEngine) renderFragment(w http.ResponseWriter, page, name string, data shell) error {
+	t, ok := v.pages[page]
+	if !ok {
+		return errors.New("unknown page template " + page)
+	}
+	var buf bytes.Buffer
+	if err := t.ExecuteTemplate(&buf, name, data); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, err := w.Write(buf.Bytes())
+	return err
+}
+
 // page renders an HTML view, falling back to the text error shape if the
 // template blows up, so a rendering bug cannot turn into a blank 200.
 func (s *Server) page(w http.ResponseWriter, r *http.Request, status int, title, name string, me *viewer, flash string, data any) {
