@@ -196,6 +196,29 @@ func TestAdminColorIsLimitedToTheTwoLocks(t *testing.T) {
 	}
 }
 
+// 颜色不是权限：站主可以给自己设紫名，别人仍然碰不了站主那一行。
+func TestOwnerCanSetOwnColor(t *testing.T) {
+	h := newHarness(t)
+	owner := h.author("owner_color", permUserManage)
+	if _, err := h.db.SQL.ExecContext(ctx(), `UPDATE site_owner SET user_id=? WHERE id=1`, h.user("owner_color").ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, page := h.postAs(owner, "/admin/users/owner_color/color", url.Values{"color": {"purple"}}); !strings.Contains(page, "紫（管理员）") {
+		t.Fatalf("站主给自己设紫名失败：\n%s", short(page))
+	}
+	if got := h.user("owner_color"); got.Color != store.ColorAdmin {
+		t.Fatalf("库里的颜色不是 purple：%+v", got)
+	}
+
+	other := h.author("other_admin_color", permUserManage)
+	if _, page := h.postAs(other, "/admin/users/owner_color/color", url.Values{"color": {"brown"}}); !strings.Contains(page, "超级管理员") {
+		t.Fatalf("别的管理员改了站主的颜色：\n%s", short(page))
+	}
+	if got := h.user("owner_color"); got.Color != store.ColorAdmin {
+		t.Fatalf("站主颜色被改掉了：%+v", got)
+	}
+}
+
 // 那条自己走的腿必须跟着进程一起停：收到信号后还有一个全表扫描在跑是不可接受的，
 // 而它等的是管理员设的间隔，最长能到一天。
 func TestRunPointsExitsWithItsContext(t *testing.T) {

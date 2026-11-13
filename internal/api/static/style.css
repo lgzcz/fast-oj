@@ -142,7 +142,7 @@ footer.top { max-width: 75rem; width: calc(100% - 3rem); margin: 0 auto; padding
 .pt-green { color: var(--pt-green); }
 .pt-orange { color: var(--pt-orange); }
 .pt-red { color: var(--pt-red); }
-.pt-purple { color: var(--pt-purple); }
+.pt-purple { color: var(--pt-purple); font-weight: 700; }
 .pt-brown { color: var(--pt-brown); }
 .table-scroll { overflow-x: auto; margin: 1.25rem 0; scrollbar-width: thin; }
 table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: .875rem; }

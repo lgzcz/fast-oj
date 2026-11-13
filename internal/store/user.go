@@ -182,6 +182,13 @@ func (db *DB) guardMutable(ctx context.Context, userID int64) error {
 	if err := db.guardOwner(ctx, userID); err != nil {
 		return err
 	}
+	return db.guardAccountActive(ctx, userID)
+}
+
+// guardAccountActive is guardMutable without the super-admin immunity. It is for
+// changes that cannot lock anyone out of the site, such as the cosmetic name
+// color, where the owner is allowed to edit their own row.
+func (db *DB) guardAccountActive(ctx context.Context, userID int64) error {
 	var status string
 	err := db.SQL.QueryRowContext(ctx, `SELECT status FROM users WHERE id=?`, userID).Scan(&status)
 	if errors.Is(err, sql.ErrNoRows) {

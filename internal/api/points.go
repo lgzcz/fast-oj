@@ -269,6 +269,29 @@ func colorOptions() []struct{ Value, Label string } {
 	return out
 }
 
+// adminColorTarget 是颜色那一格的取值规则：可以改自己（颜色不影响任何权限，不存在
+// 把自己锁在门外的风险），但站主的颜色仍然只有他自己能改。
+func (s *Server) adminColorTarget(w http.ResponseWriter, r *http.Request, a actor) (store.User, bool) {
+	u, err := s.db.GetUserByHandle(r.Context(), r.PathValue("handle"))
+	if err != nil {
+		s.writeStoreError(w, r, err)
+		return store.User{}, false
+	}
+	if u.ID == a.User.ID {
+		return u, true
+	}
+	owner, err := s.db.IsOwner(r.Context(), u.ID)
+	if err != nil {
+		s.writeStoreError(w, r, err)
+		return store.User{}, false
+	}
+	if owner {
+		s.respondError(w, r, http.StatusForbidden, "超级管理员的颜色只有他自己能改")
+		return store.User{}, false
+	}
+	return u, true
+}
+
 // handleAdminUserColor 是控制台里那一列"名字颜色"：只有紫和棕能选，外加"跟着积分自动"。
 //
 // 蓝绿橙红不在选项里——它们是积分的读数，由后台按档位算。让人手输这四档，就等于允许
@@ -278,7 +301,7 @@ func (s *Server) handleAdminUserColor(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	target, ok := s.adminTarget(w, r, a)
+	target, ok := s.adminColorTarget(w, r, a)
 	if !ok {
 		return
 	}
@@ -288,7 +311,7 @@ func (s *Server) handleAdminUserColor(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, back+"?msg="+url.QueryEscape("名字颜色只能选：跟着积分自动、紫（管理员）、棕（处罚）。"), http.StatusSeeOther)
 		return
 	}
-	if err := s.db.SetUserColor(r.Context(), target.ID, color); err != nil {
+	if err := s.db.SetUserColorBy(r.Context(), target.ID, a.User.ID, color); err != nil {
 		s.writeStoreError(w, r, err)
 		return
 	}

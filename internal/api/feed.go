@@ -42,7 +42,7 @@ func postRows(posts []store.Post, a actor) []postRow {
 		rows = append(rows, postRow{
 			ID: p.ID, Author: p.Author, DisplayName: name, Color: p.Color, When: agoMS(p.CreatedAt),
 			Body:        renderMarkdownHTML(p.Body),
-			CanDelete:   a.User.ID == p.AuthorID,
+			CanDelete:   a.User.ID == p.AuthorID || a.can(permFeedModerate),
 			CanModerate: a.can(permFeedModerate),
 			Hidden:      !p.Visible,
 		})

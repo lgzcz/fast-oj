@@ -505,13 +505,25 @@ func (db *DB) RefreshPoints(ctx context.Context, cfg PointsConfig) (int, error) 
 
 // SetUserColor 是管理员手动指定的那两种颜色（紫、棕），以及把它们放回自动。
 func (db *DB) SetUserColor(ctx context.Context, userID int64, color string) error {
+	return db.SetUserColorBy(ctx, userID, 0, color)
+}
+
+// SetUserColorBy 按"谁在改"区分两条路：改自己不算特权操作，也不会把人锁在门外，
+// 所以站主可以给自己设紫名；改别人仍然过 guardMutable，站主那一行别人碰不得。
+func (db *DB) SetUserColorBy(ctx context.Context, userID, actorID int64, color string) error {
 	if !ValidColor(color) {
 		return fmt.Errorf("unknown color %q", color)
 	}
-	if err := db.guardMutable(ctx, userID); err != nil {
+	var err error
+	if userID == actorID {
+		err = db.guardAccountActive(ctx, userID)
+	} else {
+		err = db.guardMutable(ctx, userID)
+	}
+	if err != nil {
 		return err
 	}
-	_, err := db.SQL.ExecContext(ctx, `UPDATE users SET color=? WHERE id=?`, color, userID)
+	_, err = db.SQL.ExecContext(ctx, `UPDATE users SET color=? WHERE id=?`, color, userID)
 	return err
 }
 
