@@ -209,8 +209,14 @@ func TestOwnerCanSetOwnColor(t *testing.T) {
 	if got := h.user("owner_color"); got.Color != store.ColorAdmin {
 		t.Fatalf("库里的颜色不是 purple：%+v", got)
 	}
+	if _, page := h.getAs(owner, "/admin/perms/u/owner_color"); !strings.Contains(page, "/admin/users/owner_color/color") {
+		t.Fatalf("站主自己的控制台页没有颜色表单：\n%s", short(page))
+	}
 
 	other := h.author("other_admin_color", permUserManage)
+	if _, page := h.getAs(other, "/admin/perms/u/owner_color"); strings.Contains(page, "/admin/users/owner_color/color") {
+		t.Fatalf("别的管理员的页面上出现了改站主颜色的表单：\n%s", short(page))
+	}
 	if _, page := h.postAs(other, "/admin/users/owner_color/color", url.Values{"color": {"brown"}}); !strings.Contains(page, "超级管理员") {
 		t.Fatalf("别的管理员改了站主的颜色：\n%s", short(page))
 	}

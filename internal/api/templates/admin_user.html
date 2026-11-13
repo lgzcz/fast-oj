@@ -13,11 +13,11 @@
 {{end}}
 
 {{if .Data.Self}}
-<p class="flash">这是你自己的账号。为避免把自己关在门外，控制台不允许改自己的权限、角色或状态。</p>
+<p class="flash">这是你自己的账号。为避免把自己关在门外，控制台不允许改自己的权限、角色或状态；名字颜色除外。</p>
 {{end}}
 {{if .Data.Owner}}
 <p class="flash"><b>超级管理员</b>：这个账号什么都不用授予就已经有了全部权限，别人也收不走任何一项。
-  他的权限、角色和状态只有他自己能动，所以这一页没有任何按钮。</p>
+  他的权限、角色和状态只有他自己能动；名字颜色可以自己改。</p>
 {{end}}
 
 {{if and .Data.NeedStepUp (not .Data.Self) (not .Data.Owner)}}
@@ -74,7 +74,9 @@
 </form>
 <p class="meta">标签不是权限：贴上"管理员"不会让这个账号多出任何能力，去掉也不会。全站凡是出现名字的地方
   都跟着显示，形如 <b>{{.Data.Target.Handle}} [作弊者]</b>；注销账号时和身份一起抹掉。</p>
+{{end}}
 
+{{if and .Data.CanUser (not .Data.Cancelled) (or .Data.Self (not .Data.Owner))}}
 <h2>名字颜色</h2>
 <form class="row" method="post" action="/admin/users/{{.Data.Target.Handle}}/color">
   <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
