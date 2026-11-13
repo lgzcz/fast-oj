@@ -152,6 +152,21 @@ type problemEntry struct {
 	PID, Title, Time, Mem  string
 	Cases, Solved, Submits int
 	Hidden                 bool
+	// Status is untried/tried/solved for the signed-in reader; empty for
+	// anonymous visitors, who have no history to show.
+	Status      string
+	StatusText  string
+	StatusClass string
+}
+
+func problemStatusText(status string) string {
+	switch status {
+	case store.ProblemSolved:
+		return "通过"
+	case store.ProblemTried:
+		return "尝试过"
+	}
+	return "未尝试"
 }
 
 type problemsData struct {
@@ -181,16 +196,33 @@ func (s *Server) problemsPage(w http.ResponseWriter, r *http.Request, me *viewer
 		s.writeStoreError(w, r, err)
 		return
 	}
+	var statuses map[int64]string
+	if me != nil {
+		statuses, err = s.db.ProblemStatuses(r.Context(), me.ID, ids)
+		if err != nil {
+			s.writeStoreError(w, r, err)
+			return
+		}
+	}
 
 	rows := make([]problemEntry, 0, len(page.Items))
 	for _, p := range page.Items {
 		c := counts[p.ID]
-		rows = append(rows, problemEntry{
+		entry := problemEntry{
 			PID: p.PID, Title: p.Title,
 			Time: formatMS(p.TimeLimitMS, false), Mem: formatKB(p.MemLimitKB, false),
 			Cases: cases[p.ID], Solved: c.Solved, Submits: c.Submits,
 			Hidden: !p.Visible,
-		})
+		}
+		if me != nil {
+			entry.Status = statuses[p.ID]
+			if entry.Status == "" {
+				entry.Status = store.ProblemUntried
+			}
+			entry.StatusText = problemStatusText(entry.Status)
+			entry.StatusClass = "status-" + entry.Status
+		}
+		rows = append(rows, entry)
 	}
 	s.page(w, r, http.StatusOK, "题库", "problems", me, msgOf(r), problemsData{
 		Items: rows, Total: page.Total, Limit: limit, Next: page.NextAfter,

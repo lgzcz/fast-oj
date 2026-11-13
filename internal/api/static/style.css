@@ -144,6 +144,12 @@ footer.top { max-width: 75rem; width: calc(100% - 3rem); margin: 0 auto; padding
 .pt-red { color: var(--pt-red); }
 .pt-purple { color: var(--pt-purple); font-weight: 700; }
 .pt-brown { color: var(--pt-brown); }
+
+/* 题库的三种个人状态：没碰过 / 交过但还没 AC / 已通过。 */
+.status { font-size: .82em; padding: 0 .3em; border: 1px solid currentColor; border-radius: 3px; white-space: nowrap; }
+.status-untried { color: var(--muted); }
+.status-tried { color: var(--pt-orange); }
+.status-solved { color: var(--pt-green); }
 .table-scroll { overflow-x: auto; margin: 1.25rem 0; scrollbar-width: thin; }
 table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: .875rem; }
 th, td { padding: .75rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }

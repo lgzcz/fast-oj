@@ -234,6 +234,53 @@ func (db *DB) CountProblems(ctx context.Context, visibleOnly bool) (int, error) 
 	return n, err
 }
 
+// 题库页每题旁边的三个状态。
+const (
+	ProblemUntried = "untried"
+	ProblemTried   = "tried"
+	ProblemSolved  = "solved"
+)
+
+// ProblemStatuses answers "this page of problems, did I try/solve them" in one
+// grouped query. Problems with no submission are simply absent, which the caller
+// reads as untried.
+func (db *DB) ProblemStatuses(ctx context.Context, userID int64, problemIDs []int64) (map[int64]string, error) {
+	out := make(map[int64]string, len(problemIDs))
+	if userID == 0 || len(problemIDs) == 0 {
+		return out, nil
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(problemIDs)), ",")
+	args := make([]any, 0, len(problemIDs)+1)
+	args = append(args, userID)
+	for _, id := range problemIDs {
+		args = append(args, id)
+	}
+	rows, err := db.SQL.QueryContext(ctx,
+		`SELECT problem_id, MAX(CASE WHEN verdict='AC' THEN 1 ELSE 0 END)
+		   FROM submissions
+		  WHERE user_id=? AND problem_id IN (`+placeholders+`)
+		  GROUP BY problem_id`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var (
+			id     int64
+			solved int
+		)
+		if err := rows.Scan(&id, &solved); err != nil {
+			return nil, err
+		}
+		if solved != 0 {
+			out[id] = ProblemSolved
+		} else {
+			out[id] = ProblemTried
+		}
+	}
+	return out, rows.Err()
+}
+
 // CountSolved counts distinct problems this user has AC'd.
 func (db *DB) CountSolved(ctx context.Context, userID int64) (int, error) {
 	var n int

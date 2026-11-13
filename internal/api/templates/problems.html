@@ -26,7 +26,7 @@
   </tr>
   {{range .Data.Items}}
   <tr>
-    <td><a href="/problems/{{.PID}}">{{.PID}}</a>{{if .Hidden}} <span class="hidden">未公开</span>{{end}}</td>
+    <td><a href="/problems/{{.PID}}">{{.PID}}</a>{{if .Status}} <span class="status {{.StatusClass}}">{{.StatusText}}</span>{{end}}{{if .Hidden}} <span class="hidden">未公开</span>{{end}}</td>
     <td><a href="/problems/{{.PID}}">{{.Title}}</a></td>
     <td class="num">{{.Time}}</td>
     <td class="num">{{.Mem}}</td>

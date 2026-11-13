@@ -56,6 +56,10 @@ var views = mustLoadViews()
 // reads; CSRF travels with it because every form a signed-in browser sees must
 // carry its token.
 type viewer struct {
+	// ID is the account behind the navbar. It is not rendered; pages that need
+	// "my status" (the problem list badges) read it instead of running a second
+	// authentication pass.
+	ID     int64
 	Handle string
 	Name   string
 	// Color 是这个人自己的活跃度档位类名：导航栏上的名字也该是那个颜色，

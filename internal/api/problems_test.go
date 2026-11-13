@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/liangbinchen2013/fast-oj/internal/store"
 )
 
 func zipOf(files map[string]string) []byte {
@@ -360,6 +362,49 @@ func TestListPagination(t *testing.T) {
 	_, search := h.htmlGet("/problems?q=P05", "")
 	if !strings.Contains(search, "P05") || strings.Contains(search, "P04") {
 		t.Fatalf("search:\n%s", search)
+	}
+}
+
+func TestProblemListShowsPersonalStatus(t *testing.T) {
+	h := newHarness(t)
+	reader := h.author("status_reader")
+	for _, pid := range []string{"P9101", "P9102", "P9103"} {
+		if code, body := h.createProblem(url.Values{"pid": {pid}, "title": {"status " + pid}}); code != http.StatusOK {
+			t.Fatalf("create %s = %d %q", pid, code, body)
+		}
+	}
+	uid := h.user("status_reader").ID
+	tried, _ := h.db.FindProblem(ctx(), "P9102")
+	solved, _ := h.db.FindProblem(ctx(), "P9103")
+
+	if _, err := h.db.CreateSubmission(ctx(), &store.Submission{
+		UserID: uid, ProblemID: tried.ID, Language: "cpp", Source: "int main(){}",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	sub, err := h.db.CreateSubmission(ctx(), &store.Submission{
+		UserID: uid, ProblemID: solved.ID, Language: "cpp", Source: "int main(){}",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.finishSubmission(sub.ID, store.Result{Verdict: "AC", TimeMS: 1, MemKB: 1, Score: 1, TotalScore: 1}, nil)
+
+	_, page := h.getAs(reader, "/problems")
+	for _, want := range []string{
+		`class="status status-untried">未尝试`,
+		`class="status status-tried">尝试过`,
+		`class="status status-solved">通过`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("missing %q in problem list:\n%s", want, short(page))
+		}
+	}
+	if strings.Index(page, "P9101") > strings.Index(page, "未尝试") {
+		t.Error("badges are not attached to the problem they describe")
+	}
+	if _, anon := h.htmlGet("/problems", ""); strings.Contains(anon, "status-untried") {
+		t.Error("anonymous page renders a personal status it cannot know")
 	}
 }
 
