@@ -1,0 +1,17 @@
+{{define "content"}}
+<div class="auth-shell">
+  <section class="auth-card">
+    <h1>两步验证</h1>
+    <p class="meta">密码已经通过。请输入验证器里的六位码；如果手机丢了，用一枚恢复码。</p>
+
+    <form method="post" action="/login/2fa">
+      <label for="twofa-code">六位验证码或恢复码</label>
+      <input id="twofa-code" type="text" name="code" inputmode="numeric" autocomplete="one-time-code"
+             maxlength="16" required autofocus>
+      <p><input type="submit" value="验证并登录"></p>
+    </form>
+
+    <p class="auth-note">连续输错 5 次这张票就作废，需要重新登录。<a href="/login">回到登录</a></p>
+  </section>
+</div>
+{{end}}

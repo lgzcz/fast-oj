@@ -1,0 +1,81 @@
+{{define "content"}}
+<h1>安全</h1>
+<p class="meta"><a href="/settings">← 回到设置</a></p>
+
+{{if .Data.Errors}}
+<div class="flash">{{range .Data.Errors}}<p>{{.}}</p>{{end}}</div>
+{{end}}
+
+{{if .Data.RecoveryCodes}}
+<h2>恢复码（只显示这一次）</h2>
+<p class="flash">抄下来放在离线的地方。每枚只能用一次；全部用完之前重新设置两步验证可以换一批。</p>
+<pre><code>{{range .Data.RecoveryCodes}}{{.}}
+{{end}}</code></pre>
+{{end}}
+
+<h2>两步验证</h2>
+{{if .Data.TOTPEnabled}}
+<p>已启用。剩余恢复码 <b>{{.Data.RecoveryLeft}}</b> 枚。</p>
+<form method="post" action="/settings/2fa/disable"
+      onsubmit="return confirm('关闭两步验证？之后只用密码就能登录。')">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  {{if .Data.HasPassword}}
+  <label>当前密码</label>
+  <input type="password" name="password" autocomplete="current-password" required>
+  {{end}}
+  <p><button type="submit" class="danger">关闭两步验证</button></p>
+</form>
+{{else if .Data.PendingSecret}}
+<p>用验证器扫下面的链接，或者手动输入密钥；然后输入它显示的六位码完成启用。</p>
+<label>密钥</label>
+<pre><code>{{.Data.PendingSecret}}</code></pre>
+<p class="meta">otpauth 链接：<code>{{.Data.OTPURL}}</code></p>
+<form method="post" action="/settings/2fa/enable">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <label>验证器显示的六位码</label>
+  <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required>
+  <p><input type="submit" value="启用两步验证"></p>
+</form>
+<form method="post" action="/settings/2fa/setup">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <p><button type="submit">换一个密钥</button></p>
+</form>
+{{else}}
+<p>登录时除了密码再要一枚验证器生成的六位码。启用后，当前浏览器以外的已登录设备会被退出。</p>
+<form method="post" action="/settings/2fa/setup">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <p><input type="submit" value="开始设置"></p>
+</form>
+{{end}}
+
+<h2>登录设备</h2>
+<p class="meta">这里列出的都是当前有效的登录会话；踢掉一台设备后，它下一次请求就会变成未登录。</p>
+<div class="table-scroll" role="region" aria-label="登录设备" tabindex="0">
+<table>
+  <tr><th>会话</th><th>地址</th><th>客户端</th><th>最近活动</th><th>登录于</th><th>操作</th></tr>
+  {{range .Data.Sessions}}
+  <tr>
+    <td><code>{{.Short}}</code>{{if .Current}} <span class="badge ok">当前</span>{{end}}</td>
+    <td>{{.IP}}</td>
+    <td>{{.Agent}}</td>
+    <td>{{.LastSeen}}</td>
+    <td>{{.Created}}</td>
+    <td>
+      {{if not .Current}}
+      <form class="inline" method="post" action="/settings/sessions/{{.ID}}/revoke"
+            onsubmit="return confirm('让这台设备退出登录？')">
+        <input type="hidden" name="csrf" value="{{$.Me.CSRF}}">
+        <button type="submit">退出</button>
+      </form>
+      {{end}}
+    </td>
+  </tr>
+  {{end}}
+</table>
+</div>
+<form method="post" action="/settings/sessions/revoke-others"
+      onsubmit="return confirm('退出所有其他设备？当前这台不受影响。')">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <p><button type="submit">退出其他所有设备</button></p>
+</form>
+{{end}}

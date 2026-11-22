@@ -100,6 +100,10 @@
 | `POST` | `/verify` | 任何人（一次性令牌） | 人机验证窗里那一下勾选：等待没结束就不认，核销过即作废，`js=1` 回 204 否则 303 |
 | `GET` `/POST` | `/register` | 公开（可关） | 自助注册；开了「注册需要验证邮箱」时会寄出一封带链接的验证信 |
 | `GET` `/POST` | `/settings` `/settings/*` | 登录用户 | 资料、密码、私信策略、邮箱验证状态与重新发送、**自己的配色**（`POST /settings/theme`） |
+| `GET` | `/settings/security` | 登录用户 | 两步验证状态、恢复码余额与登录设备列表 |
+| `POST` | `/settings/2fa/setup` `/enable` `/disable` | 登录用户 | 生成 TOTP 密钥 / 用六位码启用并生成恢复码 / 凭密码关闭 |
+| `GET` `/POST` | `/login/2fa` | 密码已通过的挑战票 | 输入六位码或恢复码建立会话（同一张票错 5 次作废） |
+| `POST` | `/settings/sessions/{id}/revoke` `/settings/sessions/revoke-others` | 登录用户 | 退出某一台设备 / 退出其他所有设备 |
 | `GET` | `/verify?token=…` | 邮件里的链接 | 验证邮箱：一次有效，用过/过期都给出原因 |
 | `GET` | `/docs` `/updates` | 公开 | 使用说明与用户可见的更新日志 |
 | `GET` | `/sitemap.xml` | 公开 | 公开题目与比赛的站点地图；隐藏内容不出现 |

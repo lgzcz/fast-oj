@@ -251,6 +251,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /u/{handle}/unfollow", s.followHandler(false))
 	mux.HandleFunc("GET /login", s.handleLoginPage)
 	mux.HandleFunc("POST /login", s.handleLogin)
+	mux.HandleFunc("GET /login/2fa", s.handleLogin2FAPage)
+	mux.HandleFunc("POST /login/2fa", s.handleLogin2FA)
 	// 忘记密码：邮件里的重置链接与两个表单页。令牌在一次成功提交后才失效。
 	mux.HandleFunc("GET /forgot", s.handleForgotPage)
 	mux.HandleFunc("POST /forgot", s.handleForgotPost)
@@ -267,6 +269,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /settings/password", s.handlePasswordSave)
 	// 配色：每个人的九格颜色，只影响他自己看到的页面。
 	mux.HandleFunc("POST /settings/theme", s.handleThemeSave)
+	mux.HandleFunc("GET /settings/security", s.handleSecurityPage)
+	mux.HandleFunc("POST /settings/2fa/setup", s.handleTOTPSetup)
+	mux.HandleFunc("POST /settings/2fa/enable", s.handleTOTPEnable)
+	mux.HandleFunc("POST /settings/2fa/disable", s.handleTOTPDisable)
+	mux.HandleFunc("POST /settings/sessions/revoke-others", s.handleSessionRevokeOthers)
+	mux.HandleFunc("POST /settings/sessions/{id}/revoke", s.handleSessionRevoke)
 	// 重新发送验证邮件：只能给自己账号上那个已经存着的地址发，表单里没有收件地址栏。
 	mux.HandleFunc("POST /settings/email/resend", s.handleResendEmail)
 

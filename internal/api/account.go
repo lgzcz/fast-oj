@@ -203,20 +203,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sess, err := s.db.CreateSession(r.Context(), u.ID, clientIP(r), r.UserAgent(), store.SessionTTL)
-	if err != nil {
-		s.writeStoreError(w, r, err)
-		return
-	}
-	if err := s.db.ClearLoginFailures(r.Context(), key); err != nil {
-		s.log.Error("throttle reset", "err", err)
-	}
-	if err := s.db.TouchLogin(r.Context(), u.ID); err != nil {
-		s.log.Error("touch login", "err", err)
-	}
-	s.setSession(w, sess.ID, store.SessionTTL)
-	s.log.Info("login", "user", u.Handle, "ip", clientIP(r))
-	http.Redirect(w, r, safeNext(r.FormValue("next")), http.StatusSeeOther)
+	s.afterPassword(w, r, u, safeNext(r.FormValue("next")))
 }
 
 // loginFailed re-renders the form instead of redirecting, so the typed handle
