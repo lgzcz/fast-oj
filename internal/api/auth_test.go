@@ -1,7 +1,9 @@
 package api
 
 import (
+	"errors"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -9,6 +11,37 @@ import (
 	"github.com/liangbinchen2013/fast-oj/internal/config"
 	"github.com/liangbinchen2013/fast-oj/internal/store"
 )
+
+// 一次请求只解析一次身份：CSRF 闸门、权限检查、导航栏问的是同一个人。
+func TestAuthenticateIsResolvedOncePerRequest(t *testing.T) {
+	h := newHarness(t)
+	h.author("cache1")
+	u := h.user("cache1")
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	mw := h.app.cacheActor(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cache, ok := r.Context().Value(actorCacheKey{}).(*actorCache)
+		if !ok {
+			t.Fatal("cacheActor 没有把缓存放进上下文")
+		}
+
+		// 第一次没有凭据：失败也会被记下，后面的调用不再重复解析。
+		if _, err := h.app.authenticate(r); !errors.Is(err, errNoCredentials) {
+			t.Fatalf("无凭据 = %v", err)
+		}
+		if !cache.ok || !errors.Is(cache.err, errNoCredentials) {
+			t.Fatalf("失败没进缓存：%+v", cache)
+		}
+
+		// 同一个请求里换成已解析的身份：不再看凭据。
+		cache.a, cache.err = actor{User: u}, nil
+		a, err := h.app.authenticate(r)
+		if err != nil || a.User.ID != u.ID {
+			t.Fatalf("缓存身份 = %+v %v", a, err)
+		}
+	}))
+	mw.ServeHTTP(httptest.NewRecorder(), req)
+}
 
 func TestRegisterRejectsBadInput(t *testing.T) {
 	h := newHarness(t)

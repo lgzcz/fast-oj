@@ -409,5 +409,5 @@ func (s *Server) logRequests(next http.Handler) http.Handler {
 func (s *Server) wrap(next http.Handler) http.Handler {
 	// guardIP 在最外层：一个被 IP 挡掉的请求仍然要进日志和流量统计，
 	// 管理员正是因为看见那一大片被拒的请求才会去封。
-	return gzipResponses(s.logRequests(s.guardIP(s.guardCSRF(next))))
+	return gzipResponses(s.logRequests(s.guardIP(s.cacheActor(s.guardCSRF(next)))))
 }

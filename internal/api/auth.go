@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/subtle"
 	"errors"
 	"fmt"
@@ -45,11 +46,41 @@ var (
 	errCSRF          = errors.New("csrf token missing or incorrect")
 )
 
+// actorCache is request-scoped: the CSRF gate, the handler's capability check and
+// the nav bar all ask "who is this" on the same request, and each answer used to
+// cost a session lookup plus a permission query. The snapshot is safe because a
+// request is one person's view of the world; the next request resolves again.
+type actorCache struct {
+	a   actor
+	err error
+	ok  bool
+}
+
+type actorCacheKey struct{}
+
+func (s *Server) cacheActor(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), actorCacheKey{}, &actorCache{})))
+	})
+}
+
 // authenticate resolves credentials from either the Authorization header (API,
 // CLI, judge boxes) or the session cookie (browser). There is deliberately no
 // "API token in a cookie" path: a cookie-based bearer would need its own CSRF
 // secret, and real sessions make it redundant.
 func (s *Server) authenticate(r *http.Request) (actor, error) {
+	cache, _ := r.Context().Value(actorCacheKey{}).(*actorCache)
+	if cache != nil && cache.ok {
+		return cache.a, cache.err
+	}
+	a, err := s.resolveActor(r)
+	if cache != nil {
+		cache.a, cache.err, cache.ok = a, err, true
+	}
+	return a, err
+}
+
+func (s *Server) resolveActor(r *http.Request) (actor, error) {
 	if token := bearerToken(r); token != "" {
 		if s.cfg.JudgeToken != "" && subtle.ConstantTimeCompare([]byte(token), []byte(s.cfg.JudgeToken)) == 1 {
 			// A judge box is a machine, not a person: no capabilities, and the
@@ -281,7 +312,7 @@ func (a actor) viewer() *viewer {
 	}
 	theme := store.ParseTheme(a.User.Theme)
 	return &viewer{
-		ID: a.User.ID,
+		ID:     a.User.ID,
 		Handle: a.User.Handle, Name: name, Color: a.User.ColorClass(), Admin: a.Admin,
 		Manage: a.can(permPermissionManage), Site: a.can(permSiteSettings),
 		Author:   a.can(permProblemCreate) || a.can(permProblemEditAny),
