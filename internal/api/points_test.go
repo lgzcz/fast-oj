@@ -120,7 +120,7 @@ func TestAdminPointsPageTunesAndRecolors(t *testing.T) {
 	}
 
 	// /about 的接口表要认得这一页，否则下一个人无从找回它存在。
-	if _, page := h.htmlGet("/about", ""); !strings.Contains(page, "/admin/points") ||
+	if _, page := h.htmlGet("/about", h.adminToken()); !strings.Contains(page, "/admin/points") ||
 		!strings.Contains(page, "/admin/users/{handle}/color") {
 		t.Error("/about 的接口表里少了积分或颜色那几条")
 	}

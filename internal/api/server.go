@@ -229,6 +229,12 @@ func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAbout(w http.ResponseWriter, r *http.Request) {
+	// 这一页写着数据目录、库文件路径、版本与完整路由表：运维找页面时有用，匿名访客
+	// 没有理由拿到一份部署地图。门槛与站点设置同一把钥匙，页脚链接也只对这些人出现。
+	a, ok := s.requirePerm(w, r, permSiteSettings)
+	if !ok {
+		return
+	}
 	uptime := time.Since(s.started).Truncate(time.Second)
 	mode, err := s.db.JournalMode(r.Context())
 	if err != nil {
@@ -334,7 +340,7 @@ func (s *Server) handleAbout(w http.ResponseWriter, r *http.Request) {
 		"  POST /judge/submissions/{id}/status|result  逐用例回报 / 终局结果",
 	}
 
-	s.page(w, r, http.StatusOK, "运行概览", "about", s.viewerOf(r), msgOf(r), map[string]any{
+	s.page(w, r, http.StatusOK, "运行概览", "about", a.viewer(), msgOf(r), map[string]any{
 		"Uptime":   uptime.String(),
 		"Go":       runtime.Version(),
 		"Platform": runtime.GOOS + "/" + runtime.GOARCH,

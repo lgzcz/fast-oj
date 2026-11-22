@@ -168,7 +168,11 @@ func TestHealthzIsPlainText(t *testing.T) {
 
 func TestAboutIsAPage(t *testing.T) {
 	h := newHarness(t)
-	code, body := h.htmlGet("/about", "")
+	// 部署地图只给能改站点设置的人看；匿名访客拿到的是一句缺少凭据。
+	if code, _ := h.htmlGet("/about", ""); code != http.StatusUnauthorized && code != http.StatusForbidden {
+		t.Fatalf("匿名 about = %d, want 401/403", code)
+	}
+	code, body := h.htmlGet("/about", h.adminToken())
 	if code != http.StatusOK {
 		t.Fatalf("about = %d", code)
 	}

@@ -58,7 +58,7 @@
   {{block "content" .}}（空白页）{{end}}
 </main>
 <footer class="top">
-  <div class="footer-bar"><span class="footer-brand">{{.Site.Title}}</span><div><a href="/about">关于本站</a><a href="/topics">社区交流</a></div></div>
+  <div class="footer-bar"><span class="footer-brand">{{.Site.Title}}</span><div>{{if .Me}}{{if .Me.Site}}<a href="/about">关于本站</a>{{end}}{{end}}<a href="/topics">社区交流</a></div></div>
   {{if .Site.Footer}}<div class="foot-note">{{markdown .Site.Footer}}</div>{{end}}
   {{if .Site.Links}}
   <div class="links">友情链接：

@@ -347,7 +347,7 @@ func TestAuditPageGateAndPaging(t *testing.T) {
 		t.Errorf("不认识的动作键应当当全部处理，行数 = %d：\n%s", n, short(junk))
 	}
 	// /about 的路由清单要有这一项：漏了它，下一个忘了这个页面存在的人无从找回来。
-	if _, about := h.htmlGet("/about", ""); !strings.Contains(about, "/admin/audit") {
+	if _, about := h.htmlGet("/about", h.adminToken()); !strings.Contains(about, "/admin/audit") {
 		t.Error("/about 的接口表里没有审计页")
 	}
 }
