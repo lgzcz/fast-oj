@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/liangbinchen2013/fast-oj/internal/store"
 )
@@ -36,6 +37,10 @@ type problemForm struct {
 	Visible bool
 	// Keep/Statement belong to the statement editor.
 	Statement string
+	// 难度/来源/标签只影响题库的阅读与筛选，不参与判题。
+	Difficulty int
+	Source     string
+	Tags       string
 }
 
 func (f problemForm) memKB() int { return int(f.MemMB*1024 + 0.5) }
@@ -51,6 +56,8 @@ func parseProblemForm(r *http.Request) (problemForm, []string) {
 		Statement: r.FormValue("statement"),
 		Langs:     r.Form["languages"],
 		Visible:   r.FormValue("visible") == "1",
+		Source:    strings.TrimSpace(r.FormValue("source")),
+		Tags:      strings.TrimSpace(r.FormValue("tags")),
 	}
 	var errs []string
 	if ms, err := strconv.Atoi(strings.TrimSpace(r.FormValue("time_ms"))); err != nil {
@@ -62,6 +69,19 @@ func parseProblemForm(r *http.Request) (problemForm, []string) {
 		errs = append(errs, "内存上限要填数字（MB）")
 	} else {
 		f.MemMB = mb
+	}
+	if n, err := strconv.Atoi(strings.TrimSpace(r.FormValue("difficulty"))); err == nil {
+		f.Difficulty = n
+	}
+	if f.Difficulty < 0 || f.Difficulty >= len(store.DifficultyOptions()) {
+		errs = append(errs, "难度不在可选范围内")
+		f.Difficulty = 0
+	}
+	if utf8.RuneCountInString(f.Source) > 80 {
+		errs = append(errs, "来源最多 80 个字")
+	}
+	if _, err := store.NormalizeProblemTags(f.Tags); err != nil {
+		errs = append(errs, "标签："+err.Error())
 	}
 
 	if f.PID == "" || len(f.PID) > maxPIDLen {
@@ -97,6 +117,12 @@ func (f problemForm) apply(p *store.Problem) {
 	p.DetailLevel = detailLevel(f.Detail)
 	p.TimeLimitMS, p.MemLimitKB, p.Visible = f.TimeMS, f.memKB(), f.Visible
 	p.Languages = f.Langs
+	p.Difficulty, p.Source = f.Difficulty, strings.TrimSpace(f.Source)
+	if tags, err := store.NormalizeProblemTags(f.Tags); err == nil {
+		p.Tags = store.SplitTags(tags)
+	} else {
+		p.Tags = nil
+	}
 }
 
 type editRow struct {
@@ -116,6 +142,9 @@ type editData struct {
 	// Detail is the chosen 详情级别 and DetailOptions the selector next to it.
 	Detail               string
 	DetailOptions        []detailOption
+	Difficulty           int
+	DifficultyOptions    []string
+	Source, Tags         string
 	Cases, Judged, Total int
 	Langs                []editRow
 	Errors               []string
@@ -133,6 +162,8 @@ func newEditData(p store.Problem, isNew bool) editData {
 		TimeMS: p.TimeLimitMS, Visible: p.Visible, IsNew: isNew,
 		MemMB: memMBText(p.MemLimitKB),
 		Key:   p.PID, Detail: detailLevel(p.DetailLevel), DetailOptions: detailOptions,
+		Difficulty: p.Difficulty, DifficultyOptions: store.DifficultyOptions(),
+		Source: p.Source, Tags: strings.Join(p.Tags, ","),
 	}
 	if isNew {
 		// A brand new problem starts from the limits most OI problems use, so the
@@ -195,6 +226,7 @@ func (d *editData) fillFromForm(f problemForm, errs []string) {
 	d.PID, d.Title, d.Statement = f.PID, f.Title, f.Statement
 	d.Detail = detailLevel(f.Detail)
 	d.TimeMS, d.Visible = f.TimeMS, f.Visible
+	d.Difficulty, d.Source, d.Tags = f.Difficulty, f.Source, f.Tags
 	d.MemMB = strings.TrimRight(strings.TrimRight(strconv.FormatFloat(f.MemMB, 'f', 3, 64), "0"), ".")
 	d.Errors = errs
 	for i := range d.Langs {

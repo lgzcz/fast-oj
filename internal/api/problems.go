@@ -39,13 +39,22 @@ func (s *Server) handleProblemList(w http.ResponseWriter, r *http.Request) {
 	limit := pageLimit(q.Get("limit"))
 	search := q.Get("q")
 	sort, sortKey := problemSortOf(q.Get("sort"))
+	difficulty, _ := strconv.Atoi(q.Get("difficulty"))
+	if difficulty < 0 || difficulty >= len(store.DifficultyOptions()) {
+		difficulty = 0
+	}
+	filter := store.ProblemFilter{
+		Difficulty: difficulty,
+		Tag:        strings.TrimSpace(q.Get("tag")),
+		Source:     strings.TrimSpace(q.Get("source")),
+	}
 	cursor := store.ProblemCursor{ID: after, PID: q.Get("key")}
-	page, err := s.db.ListProblems(r.Context(), cursor, limit, search, !a.can(permProblemEditAny), sort)
+	page, err := s.db.ListProblemsFiltered(r.Context(), cursor, limit, search, !a.can(permProblemEditAny), sort, filter)
 	if err != nil {
 		s.writeStoreError(w, r, err)
 		return
 	}
-	s.problemsPage(w, r, a.viewer(), page, limit, search, sortKey)
+	s.problemsPage(w, r, a.viewer(), page, limit, search, sortKey, filter)
 }
 
 // problemSortOf 把 URL 里的排序名翻成数据库用的枚举。认不出来就回到默认的编号升序，

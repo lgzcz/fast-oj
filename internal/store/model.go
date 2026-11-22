@@ -72,6 +72,11 @@ type Problem struct {
 	MemLimitKB  int      `json:"mem_limit_kb"`
 	Languages   []string `json:"languages,omitempty"`
 	Visible     bool     `json:"visible"`
+	// Difficulty 0 = 未标，1..5 是入门/普及/提高/省选/NOI 五档；Source 与 Tags 只在
+	// 题库页和题面上展示，不参与判题。
+	Difficulty int      `json:"difficulty"`
+	Source     string   `json:"source,omitempty"`
+	Tags       []string `json:"tags,omitempty"`
 	// DetailLevel is how much of the judging detail the submitter gets to see:
 	// none, case, diff or full. The author and the operator always see everything.
 	DetailLevel string `json:"detail_level"`

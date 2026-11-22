@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 )
 
 var ErrConflict = errors.New("already exists")
@@ -51,19 +52,67 @@ func (db *DB) TransferProblemOwner(ctx context.Context, problemID, ownerID int64
 }
 
 const problemColumns = `id, pid, title, statement, time_limit_ms, mem_limit_kb, languages,
-		visible, IFNULL(owner_id, 0), created_at, updated_at, IFNULL(detail_level, 'diff')`
+		visible, IFNULL(owner_id, 0), created_at, updated_at, IFNULL(detail_level, 'diff'),
+			difficulty, IFNULL(source, ''), IFNULL(tags, '')`
 
 func scanProblem(row scanner) (Problem, error) {
 	var (
 		p           Problem
 		langs       string
+		tags        string
 		visibleFlag int
 	)
 	err := row.Scan(&p.ID, &p.PID, &p.Title, &p.Statement, &p.TimeLimitMS, &p.MemLimitKB,
-		&langs, &visibleFlag, &p.OwnerID, &p.CreatedAt, &p.UpdatedAt, &p.DetailLevel)
+		&langs, &visibleFlag, &p.OwnerID, &p.CreatedAt, &p.UpdatedAt, &p.DetailLevel,
+		&p.Difficulty, &p.Source, &tags)
 	p.Languages = splitList(langs)
+	p.Tags = splitList(tags)
 	p.Visible = visibleFlag != 0
 	return p, notFound(err)
+}
+
+// problemDifficulties 是题库页显示的六档（0=未标）。名字是 OI 圈常见的说法，
+// 不在这里发明新分级。
+var problemDifficulties = []string{"未标", "入门", "普及", "提高", "省选", "NOI"}
+
+func DifficultyLabel(n int) string {
+	if n < 0 || n >= len(problemDifficulties) {
+		return problemDifficulties[0]
+	}
+	return problemDifficulties[n]
+}
+
+func DifficultyOptions() []string { return append([]string(nil), problemDifficulties...) }
+
+const (
+	MaxProblemTags   = 8
+	MaxProblemTagLen = 20
+)
+
+// NormalizeProblemTags 把表单原文变成库里的逗号串：去重、trim、中文逗号归一化。
+// 不合格就报错而不是静默丢——出题人以为贴上了标签，题面上却没有，比拒绝更糟。
+func NormalizeProblemTags(raw string) (string, error) {
+	parts := SplitTags(raw)
+	if len(parts) > MaxProblemTags {
+		return "", fmt.Errorf("标签最多 %d 个", MaxProblemTags)
+	}
+	seen := map[string]bool{}
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if utf8.RuneCountInString(p) > MaxProblemTagLen || len(p) > 128 {
+			return "", fmt.Errorf("单个标签最长 %d 个字", MaxProblemTagLen)
+		}
+		if strings.ContainsFunc(p, func(r rune) bool {
+			return r < 0x20 || r == 0x7f || r == '[' || r == ']' || r == ',' || r == '，'
+		}) {
+			return "", errors.New("标签里不能有方括号、逗号或控制字符")
+		}
+		if !seen[p] {
+			seen[p] = true
+			out = append(out, p)
+		}
+	}
+	return strings.Join(out, ","), nil
 }
 
 func (db *DB) CreateProblem(ctx context.Context, p *Problem) (Problem, error) {
@@ -72,11 +121,11 @@ func (db *DB) CreateProblem(ctx context.Context, p *Problem) (Problem, error) {
 	p.UpdatedAt = now
 	p.DetailLevel = detailColumn(p.DetailLevel)
 	res, err := db.SQL.ExecContext(ctx,
-		`INSERT INTO problems (pid, title, statement, time_limit_ms, mem_limit_kb, languages, visible, owner_id, created_at, updated_at, detail_level)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO problems (pid, title, statement, time_limit_ms, mem_limit_kb, languages, visible, owner_id, created_at, updated_at, detail_level, difficulty, source, tags)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		p.PID, p.Title, p.Statement, p.TimeLimitMS, p.MemLimitKB,
 		joinList(p.Languages), boolInt(p.Visible), nullInt64(p.OwnerID), p.CreatedAt, p.UpdatedAt,
-		detailColumn(p.DetailLevel))
+		detailColumn(p.DetailLevel), p.Difficulty, p.Source, joinList(p.Tags))
 	if err != nil {
 		return Problem{}, conflict(err, "pid "+p.PID)
 	}
@@ -87,10 +136,12 @@ func (db *DB) CreateProblem(ctx context.Context, p *Problem) (Problem, error) {
 func (db *DB) UpdateProblem(ctx context.Context, p Problem) (Problem, error) {
 	p.UpdatedAt = nowMS()
 	res, err := db.SQL.ExecContext(ctx,
-		`UPDATE problems SET pid=?, title=?, statement=?, time_limit_ms=?, mem_limit_kb=?, languages=?, visible=?, updated_at=?, detail_level=?
+		`UPDATE problems SET pid=?, title=?, statement=?, time_limit_ms=?, mem_limit_kb=?, languages=?, visible=?, updated_at=?, detail_level=?,
+		   difficulty=?, source=?, tags=?
 		 WHERE id=?`,
 		p.PID, p.Title, p.Statement, p.TimeLimitMS, p.MemLimitKB,
-		joinList(p.Languages), boolInt(p.Visible), p.UpdatedAt, detailColumn(p.DetailLevel), p.ID)
+		joinList(p.Languages), boolInt(p.Visible), p.UpdatedAt, detailColumn(p.DetailLevel),
+		p.Difficulty, p.Source, joinList(p.Tags), p.ID)
 	if err != nil {
 		return Problem{}, conflict(err, "pid "+p.PID)
 	}
@@ -138,9 +189,21 @@ type ProblemPage struct {
 	Total     int       `json:"total"`
 }
 
+// ProblemFilter narrows the bank by the three browsable fields. Zero values mean
+// "don't narrow", so the ordinary list keeps its old shape.
+type ProblemFilter struct {
+	Difficulty int
+	Tag        string
+	Source     string
+}
+
 // ListProblems pages over the sort key with a cursor instead of OFFSET, so deep
 // pages keep the same cost as the first one.
 func (db *DB) ListProblems(ctx context.Context, cursor ProblemCursor, limit int, search string, visibleOnly bool, sort ProblemSort) (ProblemPage, error) {
+	return db.ListProblemsFiltered(ctx, cursor, limit, search, visibleOnly, sort, ProblemFilter{})
+}
+
+func (db *DB) ListProblemsFiltered(ctx context.Context, cursor ProblemCursor, limit int, search string, visibleOnly bool, sort ProblemSort, filter ProblemFilter) (ProblemPage, error) {
 	if limit <= 0 {
 		limit = 50
 	}
@@ -171,8 +234,21 @@ func (db *DB) ListProblems(ctx context.Context, cursor ProblemCursor, limit int,
 	}
 	if search != "" {
 		like := "%" + escapeLike(search) + "%"
-		q += ` AND (pid LIKE ? ESCAPE '\' OR title LIKE ? ESCAPE '\')`
-		args = append(args, like, like)
+		q += ` AND (pid LIKE ? ESCAPE '\' OR title LIKE ? ESCAPE '\' OR tags LIKE ? ESCAPE '\' OR source LIKE ? ESCAPE '\')`
+		args = append(args, like, like, like, like)
+	}
+	if filter.Difficulty > 0 {
+		q += ` AND difficulty=?`
+		args = append(args, filter.Difficulty)
+	}
+	if filter.Tag != "" {
+		// tags 是逗号串；前后补逗号再 instr，避免 "dp" 命中 "graphdp"。
+		q += ` AND instr(','||tags||',', ','||?||',') > 0`
+		args = append(args, filter.Tag)
+	}
+	if filter.Source != "" {
+		q += ` AND source LIKE ? ESCAPE '\'`
+		args = append(args, "%"+escapeLike(filter.Source)+"%")
 	}
 	switch sort {
 	case ProblemSortPIDDesc:

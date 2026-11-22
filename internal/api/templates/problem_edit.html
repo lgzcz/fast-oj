@@ -30,6 +30,25 @@
   <label>标题</label>
   <input type="text" name="title" value="{{.Data.Title}}" maxlength="200" required>
 
+  <div class="row">
+    <div>
+      <label>难度</label>
+      <select name="difficulty">
+        {{range $i, $label := .Data.DifficultyOptions}}
+        <option value="{{$i}}" {{if eq $i $.Data.Difficulty}}selected{{end}}>{{$label}}</option>
+        {{end}}
+      </select>
+    </div>
+    <div>
+      <label>来源（可选，最多 80 字）</label>
+      <input type="text" name="source" value="{{.Data.Source}}" maxlength="80" placeholder="例如：NOIP 2018 提高组">
+    </div>
+    <div>
+      <label>标签（逗号分隔，最多 8 个，单个最长 20 字）</label>
+      <input type="text" name="tags" value="{{.Data.Tags}}" maxlength="200" placeholder="例如：动态规划，图论">
+    </div>
+  </div>
+
   <label>判题详情透露级别（出题人和运维始终看得到全部）</label>
   <select name="detail">
     {{$cur := .Data.Detail}}

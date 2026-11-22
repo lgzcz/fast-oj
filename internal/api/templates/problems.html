@@ -14,20 +14,41 @@
       <option value="time_desc"{{if eq .Data.Sort "time_desc"}} selected{{end}}>最新在前</option>
     </select>
   </div>
-  <input type="submit" value="搜索">
+  <div>
+    <label for="problem-difficulty">难度</label>
+    <select id="problem-difficulty" name="difficulty" onchange="this.form.submit()">
+      <option value="0"{{if eq .Data.Difficulty 0}} selected{{end}}>全部</option>
+      {{range $i, $label := .Data.DifficultyOptions}}{{if $i}}
+      <option value="{{$i}}"{{if eq $i $.Data.Difficulty}} selected{{end}}>{{$label}}</option>
+      {{end}}{{end}}
+    </select>
+  </div>
+  <div>
+    <label for="problem-tag">标签</label>
+    <input id="problem-tag" type="search" name="tag" placeholder="例如：动态规划" value="{{.Data.Tag}}">
+  </div>
+  <div>
+    <label for="problem-source">来源</label>
+    <input id="problem-source" type="search" name="source" placeholder="例如：NOIP" value="{{.Data.Source}}">
+  </div>
+  <input type="submit" value="筛选">
 </form>
 
 <div class="table-scroll" role="region" aria-label="数据表格" tabindex="0">
 <table>
   <tr>
-    <th>编号</th><th>标题</th>
+    <th>编号</th><th>标题</th><th>难度</th>
     <th class="num">时限</th><th class="num">内存</th>
     <th class="num">用例</th><th class="num">通过</th><th class="num">提交</th>
   </tr>
   {{range .Data.Items}}
   <tr>
     <td><a href="/problems/{{.PID}}">{{.PID}}</a>{{if .Status}} <span class="status {{.StatusClass}}">{{.StatusText}}</span>{{end}}{{if .Hidden}} <span class="hidden">未公开</span>{{end}}</td>
-    <td><a href="/problems/{{.PID}}">{{.Title}}</a></td>
+    <td><a href="/problems/{{.PID}}">{{.Title}}</a>
+      {{if .Tags}}<span class="meta">{{range .Tags}}<span class="badge">{{.}}</span> {{end}}</span>{{end}}
+      {{with .Source}}<span class="meta">来源：{{.}}</span>{{end}}
+    </td>
+    <td>{{if ne .Difficulty "未标"}}{{.Difficulty}}{{else}}—{{end}}</td>
     <td class="num">{{.Time}}</td>
     <td class="num">{{.Mem}}</td>
     <td class="num">{{.Cases}}</td>
@@ -35,14 +56,14 @@
     <td class="num">{{.Submits}}</td>
   </tr>
   {{else}}
-  <tr><td colspan="7">还没有题目。</td></tr>
+  <tr><td colspan="8">还没有题目。</td></tr>
   {{end}}
 </table>
 </div>
 
 <p class="meta">
   共 {{.Data.Total}} 题
-  {{if .Data.Next}}· <a href="/problems?sort={{.Data.Sort}}&after={{.Data.Next}}&limit={{.Data.Limit}}{{with .Data.Query}}&q={{.}}{{end}}">下一页 →</a>{{end}}
-  {{if .Data.NextKey}}· <a href="/problems?sort={{.Data.Sort}}&key={{.Data.NextKey}}&limit={{.Data.Limit}}{{with .Data.Query}}&q={{.}}{{end}}">下一页 →</a>{{end}}
+  {{if .Data.Next}}· <a href="/problems?sort={{.Data.Sort}}&after={{.Data.Next}}&limit={{.Data.Limit}}{{with .Data.Query}}&q={{.}}{{end}}{{if .Data.Difficulty}}&difficulty={{.Data.Difficulty}}{{end}}{{with .Data.Tag}}&tag={{.}}{{end}}{{with .Data.Source}}&source={{.}}{{end}}">下一页 →</a>{{end}}
+  {{if .Data.NextKey}}· <a href="/problems?sort={{.Data.Sort}}&key={{.Data.NextKey}}&limit={{.Data.Limit}}{{with .Data.Query}}&q={{.}}{{end}}{{if .Data.Difficulty}}&difficulty={{.Data.Difficulty}}{{end}}{{with .Data.Tag}}&tag={{.}}{{end}}{{with .Data.Source}}&source={{.}}{{end}}">下一页 →</a>{{end}}
 </p>
 {{end}}

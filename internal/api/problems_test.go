@@ -144,6 +144,55 @@ func TestProblemCRUDThroughTheWebForm(t *testing.T) {
 	}
 }
 
+// F5：难度、来源、标签是题库的阅读信息；筛选必须真的按这些列走，而不是只在页面上摆个框。
+func TestProblemMetaAndFilters(t *testing.T) {
+	h := newHarness(t)
+	setter := h.signIn("meta-author", permProblemCreate)
+	v := problemValues("PM1", "带标签的题")
+	v.Set("difficulty", "3")
+	v.Set("source", "NOIP 2020")
+	v.Set("tags", "动态规划，图论,动态规划")
+	if code, body := h.postAs(setter, "/problems", v); code != http.StatusOK {
+		t.Fatalf("建题 = %d %s", code, short(body))
+	}
+
+	if _, page := h.htmlGet("/problems/PM1", ""); !strings.Contains(page, "提高") ||
+		!strings.Contains(page, "NOIP 2020") || !strings.Contains(page, "动态规划") ||
+		!strings.Contains(page, "图论") {
+		t.Errorf("题面没显示难度/来源/标签：\n%s", short(page))
+	}
+	if _, page := h.getAs(setter, "/problems/PM1/edit"); !strings.Contains(page, `value="NOIP 2020"`) ||
+		!strings.Contains(page, `value="动态规划,图论"`) {
+		t.Errorf("编辑页没回填元信息：\n%s", short(page))
+	}
+
+	hit := "/problems?difficulty=3&tag=" + url.QueryEscape("动态规划") + "&source=" + url.QueryEscape("NOIP")
+	if _, page := h.htmlGet(hit, ""); !strings.Contains(page, "PM1") {
+		t.Errorf("按难度+标签+来源没筛到：\n%s", short(page))
+	}
+	for _, miss := range []string{
+		"/problems?difficulty=1",
+		"/problems?tag=" + url.QueryEscape("图"),
+		"/problems?source=" + url.QueryEscape("NOI 2019"),
+	} {
+		if _, page := h.htmlGet(miss, ""); strings.Contains(page, "PM1") {
+			t.Errorf("%s 不该命中 PM1", miss)
+		}
+	}
+	// 搜索词也覆盖标签与来源。
+	if _, page := h.htmlGet("/problems?q="+url.QueryEscape("动态规划"), ""); !strings.Contains(page, "PM1") {
+		t.Error("搜索没有覆盖标签")
+	}
+
+	// 不合格的标签拒绝保存，并把原文留在框里。
+	bad := problemValues("PM2", "坏标签")
+	bad.Set("tags", "[作弊]")
+	if code, body := h.postAs(setter, "/problems", bad); code != http.StatusBadRequest ||
+		!strings.Contains(body, "[作弊]") {
+		t.Fatalf("坏标签 = %d\n%s", code, short(body))
+	}
+}
+
 func TestProblemPreviewRendersWithoutSaving(t *testing.T) {
 	h := newHarness(t)
 	setter := h.signIn("previewer", permProblemCreate)

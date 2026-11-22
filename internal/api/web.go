@@ -152,6 +152,10 @@ type problemEntry struct {
 	PID, Title, Time, Mem  string
 	Cases, Solved, Submits int
 	Hidden                 bool
+	// Difficulty 与 Tags/Source 是题库的阅读标签；未标难度不占表格的一列。
+	Difficulty string
+	Tags       []string
+	Source     string
 	// Status is untried/tried/solved for the signed-in reader; empty for
 	// anonymous visitors, who have no history to show.
 	Status      string
@@ -179,9 +183,13 @@ type problemsData struct {
 	NextKey string
 	Sort    string
 	Query   string
+	// 筛选：难度 0 = 全部，标签与来源是字面包含。
+	Difficulty        int
+	DifficultyOptions []string
+	Tag, Source       string
 }
 
-func (s *Server) problemsPage(w http.ResponseWriter, r *http.Request, me *viewer, page store.ProblemPage, limit int, search, sort string) {
+func (s *Server) problemsPage(w http.ResponseWriter, r *http.Request, me *viewer, page store.ProblemPage, limit int, search, sort string, filter store.ProblemFilter) {
 	ids := make([]int64, len(page.Items))
 	for i, p := range page.Items {
 		ids[i] = p.ID
@@ -212,7 +220,8 @@ func (s *Server) problemsPage(w http.ResponseWriter, r *http.Request, me *viewer
 			PID: p.PID, Title: p.Title,
 			Time: formatMS(p.TimeLimitMS, false), Mem: formatKB(p.MemLimitKB, false),
 			Cases: cases[p.ID], Solved: c.Solved, Submits: c.Submits,
-			Hidden: !p.Visible,
+			Hidden:     !p.Visible,
+			Difficulty: store.DifficultyLabel(p.Difficulty), Tags: p.Tags, Source: p.Source,
 		}
 		if me != nil {
 			entry.Status = statuses[p.ID]
@@ -227,6 +236,8 @@ func (s *Server) problemsPage(w http.ResponseWriter, r *http.Request, me *viewer
 	s.page(w, r, http.StatusOK, "题库", "problems", me, msgOf(r), problemsData{
 		Items: rows, Total: page.Total, Limit: limit, Next: page.NextAfter,
 		NextKey: url.QueryEscape(page.NextPID), Sort: sort, Query: search,
+		Difficulty: filter.Difficulty, DifficultyOptions: store.DifficultyOptions(),
+		Tag: filter.Tag, Source: filter.Source,
 	})
 }
 
@@ -259,6 +270,10 @@ type problemData struct {
 	Time, Mem  string
 	LangText   string
 	Langs      []string
+	// DifficultyText/Source/Tags 是题库的阅读信息，空或"未标"时模板不摆出来。
+	DifficultyText string
+	Source         string
+	Tags           []string
 	// Versions 是提交页上的版本下拉：每根轴一份候选，值与判机的候选表同源。
 	Versions []versionAxis
 	// Mode 是题面页上那句"这题怎么判"（SPJ / 交互题）。普通题是空串，不打扰学生。
@@ -411,6 +426,7 @@ func (s *Server) problemPage(w http.ResponseWriter, r *http.Request, a actor, p 
 		PID: p.PID, Title: p.Title,
 		Time: formatMS(p.TimeLimitMS, false), Mem: formatKB(p.MemLimitKB, false),
 		LangText: langText, Langs: options, Versions: versionAxesFor(options),
+		DifficultyText: store.DifficultyLabel(p.Difficulty), Source: p.Source, Tags: p.Tags,
 		Mode:        modeBadge(programs),
 		JudgedCases: judged, TotalScore: total,
 		Solved: c.Solved, Submits: c.Submits,
@@ -496,10 +512,10 @@ type submissionData struct {
 	Language  string
 	// Version 是这次判完能引用的那句实话："C++17 · O2 开"。老数据也有，因为它的默认
 	// 口径正是把版本拆成选项之前硬编码的那一条命令行。
-	Version   string
-	Class     string
-	Outcome   string
-	Headline  string
+	Version  string
+	Class    string
+	Outcome  string
+	Headline string
 	// Status is the raw state machine value; the live fragment carries it in a
 	// data attribute so the poller knows when to stop.
 	Status    string
