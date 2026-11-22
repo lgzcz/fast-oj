@@ -384,3 +384,7 @@ body[data-page=settings] main > form > label:first-of-type { margin-top: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+.profile-cover { height: 12rem; border: 1px solid var(--line); border-radius: var(--radius); background-size: cover; background-position: center; margin: .25rem 0 1rem; }
+.profile-cover-small { height: 6rem; margin-top: .5rem; }
+.avatar { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); margin: .25rem 0 .5rem; }

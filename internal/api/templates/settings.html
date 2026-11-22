@@ -13,6 +13,29 @@
   旧链接之后再点就无效了。邮件没发出去的话，原因会显示在这句话上面，那是站长发信的配置问题，不是你的账号问题。</p>
 {{end}}
 
+<h2>头像与封面</h2>
+<div class="row">
+  <div>
+    {{if .Data.AvatarURL}}<img class="avatar" src="{{.Data.AvatarURL}}" alt="当前头像">{{else}}<p class="meta">还没有头像。</p>{{end}}
+    <form method="post" action="/settings/avatar" enctype="multipart/form-data">
+      <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+      <label>上传头像（PNG / JPEG / GIF / WebP，≤ 2MB）</label>
+      <input type="file" name="file" accept="image/png,image/jpeg,image/gif,image/webp" required>
+      <p><input type="submit" value="更新头像"></p>
+    </form>
+  </div>
+  <div style="flex:1 1 20rem">
+    {{if .Data.CoverURL}}<div class="profile-cover profile-cover-small" style="background-image:url({{.Data.CoverURL}})"></div>{{else}}<p class="meta">还没有封面。</p>{{end}}
+    <form method="post" action="/settings/cover" enctype="multipart/form-data">
+      <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+      <label>上传封面（同类型，≤ 8MB）</label>
+      <input type="file" name="file" accept="image/png,image/jpeg,image/gif,image/webp" required>
+      <p><input type="submit" value="更新封面"></p>
+    </form>
+  </div>
+</div>
+<p class="meta">正文里要贴图，用 <a href="/images">我的图床</a> 上传后复制链接；图片是公开资源。</p>
+
 <h2>个人资料</h2>
 <form method="post" action="/settings/profile">
   <input type="hidden" name="csrf" value="{{.Me.CSRF}}">

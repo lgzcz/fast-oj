@@ -1,4 +1,6 @@
 {{define "content"}}
+{{if .Data.CoverURL}}<div class="profile-cover" style="background-image:url({{.Data.CoverURL}})"></div>{{end}}
+{{if .Data.AvatarURL}}<img class="avatar" src="{{.Data.AvatarURL}}" alt="">{{end}}
 <h1 class="pt-{{.Data.NameColor}}">{{if .Data.DisplayName}}{{.Data.DisplayName}}{{else}}{{.Data.Handle}}{{end}}</h1>
 <p class="meta">
   {{if ne .Data.DisplayName ""}}@{{.Data.Handle}} · {{end}}{{if .Data.Owner}}超级管理员 · {{else if .Data.Admin}}管理员 · {{end}}注册于 {{.Data.Joined}} ·

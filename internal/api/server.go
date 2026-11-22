@@ -283,6 +283,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /settings/password", s.handlePasswordSave)
 	// 配色：每个人的九格颜色，只影响他自己看到的页面。
 	mux.HandleFunc("POST /settings/theme", s.handleThemeSave)
+	mux.HandleFunc("POST /settings/avatar", s.handleAvatarUpload)
+	mux.HandleFunc("POST /settings/cover", s.handleCoverUpload)
+	mux.HandleFunc("GET /images", s.handleImagesPage)
+	mux.HandleFunc("POST /images/upload", s.handleImagePostUpload)
+	mux.HandleFunc("GET /images/{id}", s.handleImageGet)
+	mux.HandleFunc("POST /images/{id}/delete", s.handleImageDelete)
 	mux.HandleFunc("GET /settings/security", s.handleSecurityPage)
 	mux.HandleFunc("POST /settings/2fa/setup", s.handleTOTPSetup)
 	mux.HandleFunc("POST /settings/2fa/enable", s.handleTOTPEnable)

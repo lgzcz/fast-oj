@@ -716,6 +716,10 @@ type userData struct {
 	Points int
 	// Rating is the Elo number moved by 计入 rating contests.
 	Rating int
+	// AvatarURL/CoverURL are empty when the person has not uploaded one; the
+	// templates then render exactly what they did before this feature existed.
+	AvatarURL string
+	CoverURL  string
 	Dims   []store.Dim
 	// NameColor 是这个名字该渲染成哪一档。
 	NameColor  string
@@ -843,6 +847,19 @@ func (s *Server) handleUser(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, r, err)
 		return
 	}
+	avatarURL, coverURL := "", ""
+	if img, ok, err := s.db.LatestImage(ctx, u.ID, store.ImageAvatar); err != nil {
+		s.writeStoreError(w, r, err)
+		return
+	} else if ok {
+		avatarURL = imageURL(img.ID)
+	}
+	if img, ok, err := s.db.LatestImage(ctx, u.ID, store.ImageCover); err != nil {
+		s.writeStoreError(w, r, err)
+		return
+	} else if ok {
+		coverURL = imageURL(img.ID)
+	}
 
 	s.page(w, r, http.StatusOK, u.Handle, "user", me, msgOf(r), userData{
 		Handle: u.Handle, DisplayName: u.DisplayName,
@@ -853,6 +870,7 @@ func (s *Server) handleUser(w http.ResponseWriter, r *http.Request) {
 		Cancelled: u.IsCancelled(),
 		Solved:    len(solved), TotalProblems: totalProblems, Submits: submits,
 		Points: u.Points, Rating: u.Rating, Dims: u.Dims(), NameColor: u.ColorClass(),
+		AvatarURL: avatarURL, CoverURL: coverURL,
 		Tally: tallyRows, SolvedList: solvedList, Recent: rows,
 		Posts:     postRows(myPosts, a),
 		IsSelf:    a.User.ID == u.ID,

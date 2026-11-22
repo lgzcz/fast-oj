@@ -198,7 +198,7 @@ func (s *Server) handlePrivacy(w http.ResponseWriter, r *http.Request) {
 	}
 	policy := r.FormValue("dm_policy")
 	if !store.ValidDMPolicy(policy) {
-		s.page(w, r, http.StatusBadRequest, "设置", "settings", a.viewer(), "不认识的消息策略", s.buildSettings(a))
+		s.page(w, r, http.StatusBadRequest, "设置", "settings", a.viewer(), "不认识的消息策略", s.buildSettings(r.Context(), a))
 		return
 	}
 	if err := s.db.SetDMPolicy(r.Context(), a.User.ID, policy); err != nil {

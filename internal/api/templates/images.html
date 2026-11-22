@@ -1,0 +1,40 @@
+{{define "content"}}
+<h1>我的图床</h1>
+<p class="meta">已存 {{.Data.Count}} / {{.Data.Max}} 张。图片是公开资源（知道链接的人都能看）；只收 PNG / JPEG / GIF / WebP。</p>
+
+<form class="row" method="post" action="/images/upload" enctype="multipart/form-data">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <div style="flex:1 1 20rem">
+    <label>上传图片（≤ 8MB）</label>
+    <input type="file" name="file" accept="image/png,image/jpeg,image/gif,image/webp" required>
+  </div>
+  <div><label>&nbsp;</label><input type="submit" value="上传"></div>
+</form>
+
+<div class="table-scroll" role="region" aria-label="我的图片" tabindex="0">
+<table>
+  <tr><th>图片</th><th>用途</th><th>链接</th><th>大小</th><th>上传</th><th>操作</th></tr>
+  {{range .Data.Rows}}
+  <tr>
+    <td><a href="{{.URL}}"><img src="{{.URL}}" alt="" style="max-height:64px;max-width:96px"></a></td>
+    <td>{{.KindLabel}}</td>
+    <td><code>{{.URL}}</code></td>
+    <td>{{.Size}}</td>
+    <td>{{.When}}</td>
+    <td>
+      <form class="inline" method="post" action="{{.URL}}/delete"
+            onsubmit="return confirm('删掉这张图？正文里已经贴了的链接会变成 404。')">
+        <input type="hidden" name="csrf" value="{{$.Me.CSRF}}">
+        <button type="submit">删除</button>
+      </form>
+    </td>
+  </tr>
+  {{else}}
+  <tr><td colspan="6">还没有上传过图片。</td></tr>
+  {{end}}
+</table>
+</div>
+
+<p class="meta">头像与封面在 <a href="/settings">设置</a> 页上传；这里上传的是正文用图。
+  删除当前头像/封面会退回上一张（如果还有）。</p>
+{{end}}

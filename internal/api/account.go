@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net"
 	"net/http"
@@ -468,15 +469,24 @@ type settingsData struct {
 	EmailVerified bool
 	// Theme 是这一页的配色卡：九格颜色 + 明暗底色，只影响看的人自己。
 	Theme themeView
+	AvatarURL string
+	CoverURL  string
 }
 
-func (s *Server) buildSettings(a actor) settingsData {
-	return settingsData{
+func (s *Server) buildSettings(ctx context.Context, a actor) settingsData {
+	d := settingsData{
 		Email: a.User.Email, DisplayName: a.User.DisplayName, Bio: a.User.Bio,
 		HasPassword: a.User.HasPassword, Joined: agoMS(a.User.CreatedAt),
 		DMPolicy: a.User.DMPolicy, EmailVerified: a.User.EmailVerified,
 		Theme: buildThemeView(a.User.Theme),
 	}
+	if img, ok, err := s.db.LatestImage(ctx, a.User.ID, store.ImageAvatar); err == nil && ok {
+		d.AvatarURL = imageURL(img.ID)
+	}
+	if img, ok, err := s.db.LatestImage(ctx, a.User.ID, store.ImageCover); err == nil && ok {
+		d.CoverURL = imageURL(img.ID)
+	}
+	return d
 }
 
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
@@ -485,7 +495,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login?next=/settings", http.StatusSeeOther)
 		return
 	}
-	s.page(w, r, http.StatusOK, "设置", "settings", a.viewer(), msgOf(r), s.buildSettings(a))
+	s.page(w, r, http.StatusOK, "设置", "settings", a.viewer(), msgOf(r), s.buildSettings(r.Context(), a))
 }
 
 func (s *Server) handleProfileSave(w http.ResponseWriter, r *http.Request) {
