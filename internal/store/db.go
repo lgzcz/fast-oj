@@ -56,7 +56,9 @@ func Open(ctx context.Context, path string) (*DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
-	// WAL readers run in parallel; a single writer avoids SQLITE_BUSY churn.
+	// 8 个连接是给 WAL 的读者留的：写本身在 SQLite 里是串行的，第二个写者会在
+	// busy_timeout(5000) 里等而不是立刻 SQLITE_BUSY。把池压到 1 会把读也一起串起来，
+	// 所以真正的写放大要在调用侧削（会话 stamp、审计限流），而不是在这里减少连接。
 	sqldb.SetMaxOpenConns(8)
 	sqldb.SetMaxIdleConns(8)
 	sqldb.SetConnMaxLifetime(time.Hour)
