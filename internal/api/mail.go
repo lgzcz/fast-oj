@@ -126,6 +126,23 @@ func smtpFromForm(r *http.Request, saved store.SMTPConfig) (store.SMTPConfig, st
 	return c, ""
 }
 
+// sendPasswordResetMail 走与验证邮件同一个 SMTP 配置。正文只放一条链接和
+// 有效期，不写账号、邮箱或任何可以从信里直接读出来的秘密以外的信息。
+func (s *Server) sendPasswordResetMail(ctx context.Context, site store.SiteConfig, baseURL, to, handle, token string) error {
+	cfg := smtpFromEnv(site.SMTP)
+	subject := "重置你的 " + site.Title + " 密码"
+	return sendMail(cfg, to, subject, passwordResetBody(baseURL, handle, token))
+}
+
+func passwordResetBody(baseURL, handle, token string) string {
+	link := strings.TrimSuffix(baseURL, "/") + "/reset?token=" + url.QueryEscape(token)
+	return "你好，" + handle + "。\n\n" +
+		"有人（希望是你）申请重置这个账号的密码。点下面这个链接设置新密码：\n\n" +
+		link + "\n\n" +
+		"链接 30 分钟内有效，只能使用一次；设置成功之后，旧密码和所有已登录的会话都会失效。\n" +
+		"如果不是你申请的，忽略这封邮件即可，密码不会被改动。\n"
+}
+
 // sendVerificationMail is the registration path's one job: put a link in a mail. It is
 // separate from the mail body builder so the resend form and the registration form send
 // byte for byte the same message.

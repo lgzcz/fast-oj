@@ -64,10 +64,14 @@
 | `POST` | `/settings/privacy` | 登录用户 | 设置谁可以给我发私信 |
 | `POST` | `/checkin` | 登录用户 | 每日打卡，返回连续天数 |
 | `GET` `/POST` | `/login` `/logout` | — | 邮箱或用户名 + 密码登录，session cookie |
+| `GET` `/POST` | `/forgot` | 公开（要配 SMTP） | 找回密码：填邮箱，寄一条 30 分钟、一次性的重置链接；不暴露账号是否存在 |
+| `GET` `/POST` | `/reset` | 邮件里的链接 | 设置新密码；成功后退掉该账号全部会话。令牌绑签发时的密码指纹 |
 | `POST` | `/verify` | 任何人（一次性令牌） | 人机验证窗里那一下勾选：等待没结束就不认，核销过即作废，`js=1` 回 204 否则 303 |
 | `GET` `/POST` | `/register` | 公开（可关） | 自助注册；开了「注册需要验证邮箱」时会寄出一封带链接的验证信 |
 | `GET` `/POST` | `/settings` `/settings/*` | 登录用户 | 资料、密码、私信策略、邮箱验证状态与重新发送、**自己的配色**（`POST /settings/theme`） |
 | `GET` | `/verify?token=…` | 邮件里的链接 | 验证邮箱：一次有效，用过/过期都给出原因 |
+| `GET` | `/docs` `/updates` | 公开 | 使用说明与用户可见的更新日志 |
+| `GET` | `/sitemap.xml` | 公开 | 公开题目与比赛的站点地图；隐藏内容不出现 |
 | `POST` | `/judge/claim` | 判机令牌 | 心跳 + 领取一条（空队列返回 404 `queue empty`） |
 | `GET` | `/judge/submissions/{id}/cases/{ordinal}/{in\|out}?judge=NAME` | 判机令牌 + 本机确实领到了这条工单 | 取这条工单的用例正文（含判题用例）。按「第 N 条」取而不是按用例 id 取：拿到令牌的人因此读不到自己没被派到的题的数据 |
 | `POST` | `/judge/submissions/{id}/status` | 判机令牌 | 进度 + 逐用例回报（`compiling` → `running`） |

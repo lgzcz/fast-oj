@@ -219,6 +219,11 @@ func (s *Server) redirectToForm(w http.ResponseWriter, r *http.Request, kind, ms
 	back := "/register"
 	if kind == store.VerifyLogin {
 		back = "/login"
+		// 登录用的这道闸也被找回密码页借去挡机器：从 /forgot 点的那一下要回 /forgot，
+		// 而不是把人扔到登录页。只认这个站内路径，不跟 Referer 的其它部分走。
+		if u, err := url.Parse(r.Referer()); err == nil && u.Path == "/forgot" {
+			back = "/forgot"
+		}
 	}
 	http.Redirect(w, r, back+"?msg="+url.QueryEscape(msg), http.StatusSeeOther)
 }

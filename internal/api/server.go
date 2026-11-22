@@ -166,6 +166,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /u/{handle}/unfollow", s.followHandler(false))
 	mux.HandleFunc("GET /login", s.handleLoginPage)
 	mux.HandleFunc("POST /login", s.handleLogin)
+	// 忘记密码：邮件里的重置链接与两个表单页。令牌在一次成功提交后才失效。
+	mux.HandleFunc("GET /forgot", s.handleForgotPage)
+	mux.HandleFunc("POST /forgot", s.handleForgotPost)
+	mux.HandleFunc("GET /reset", s.handleResetPage)
+	mux.HandleFunc("POST /reset", s.handleResetPost)
 	mux.HandleFunc("GET /register", s.handleRegisterPage)
 	mux.HandleFunc("POST /register", s.handleRegister)
 	// 人机验证窗里那一下勾选：只有到这里才算数，写在表单里的秒数不算。
@@ -309,6 +314,8 @@ func (s *Server) handleAbout(w http.ResponseWriter, r *http.Request) {
 		"  GET  /messages                私信收件箱；/messages/{handle} 一对一对话",
 		"  POST /messages/{handle}       发一条私信（受收信策略限制）",
 		"  GET  /login /register         登录 / 注册",
+		"  GET  /forgot                  忘记密码：填邮箱，收一条 30 分钟一次性的重置链接（发信要配 SMTP）",
+		"  GET  /reset?token=…           邮件里的重置链接；POST /reset 改成新密码并踢掉全部会话",
 		"  POST /verify                  人机验证窗里那一下勾选：等待没结束就不认，令牌一次性的",
 		"  GET  /settings                个人资料、密码、私信策略、配色、邮箱验证状态",
 		"  POST /settings/theme          保存自己那九格颜色与明暗模式：只有他本人看到的页面跟着变",

@@ -78,7 +78,7 @@
   document.addEventListener('DOMContentLoaded', function () {
     var box = document.querySelector('form.human-verify');
     if (!box) return;
-    var main = document.querySelector('form[action="/register"], form[action="/login"]');
+    var main = document.querySelector('form[action="/register"], form[action="/login"], form[action="/forgot"]');
     var submit = main ? main.querySelector('[type=submit]') : null;
     var tick = box.querySelector('.human-verify-tick');
     if (!submit || !tick) return;
