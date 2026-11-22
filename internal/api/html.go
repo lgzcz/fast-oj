@@ -16,7 +16,7 @@ import (
 	"github.com/liangbinchen2013/fast-oj/internal/store"
 )
 
-//go:embed templates/*.html static/*
+//go:embed templates/*.html static
 var assetFS embed.FS
 
 // assetVersions fingerprints the embedded assets. The binary is the release, so a
@@ -208,7 +208,18 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request, status int, title,
 
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	if name == "" || !strings.HasSuffix(name, ".css") && !strings.HasSuffix(name, ".js") {
+	switch {
+	case strings.HasSuffix(name, ".css"):
+		w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	case strings.HasSuffix(name, ".js"):
+		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+	case strings.HasSuffix(name, ".woff2"):
+		w.Header().Set("Content-Type", "font/woff2")
+	case strings.HasSuffix(name, ".woff"):
+		w.Header().Set("Content-Type", "font/woff")
+	case strings.HasSuffix(name, ".ttf"):
+		w.Header().Set("Content-Type", "font/ttf")
+	default:
 		s.respondError(w, r, http.StatusNotFound, "no such asset")
 		return
 	}
@@ -217,18 +228,15 @@ func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
 		s.respondError(w, r, http.StatusNotFound, "no such asset")
 		return
 	}
-	switch {
-	case strings.HasSuffix(name, ".css"):
-		w.Header().Set("Content-Type", "text/css; charset=utf-8")
-	case strings.HasSuffix(name, ".js"):
-		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
-	default:
-		s.respondError(w, r, http.StatusNotFound, "no such asset")
-		return
+	// 带 ?v= 的资源可以缓存一年：新二进制换新哈希。KaTeX 的 CSS 是从 math.js 里按
+	// 固定路径加载的（那里没有模板可以填版本），所以它和字体退回一天，升级后最迟一天
+	// 就能换过来。
+	if strings.HasPrefix(name, "katex.") || strings.HasSuffix(name, ".woff2") ||
+		strings.HasSuffix(name, ".woff") || strings.HasSuffix(name, ".ttf") {
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+	} else {
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	}
-	// The URL carries the content hash, so this can be cached for a year: a new
-	// binary produces a new ?v=, and an old page never asks for the old name.
-	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(body)

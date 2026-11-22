@@ -1,14 +1,15 @@
-// KaTeX costs about 300 KB of CSS+JS plus another 100-180 KB of woff2 fonts, and
-// most pages here contain no math at all. So nothing is referenced from the page
-// template: this script looks for the nodes the Markdown renderer emits
-// (<span class="math inline">\( ... \)</span> / <span class="math display">) and
-// only then pulls the library. A page without formulas never contacts the CDN.
+// KaTeX costs about 1.5 MB with fonts, and most pages here contain no math at all.
+// So nothing is referenced from the page template: this script looks for the nodes
+// the Markdown renderer emits (<span class="math inline">\( ... \)</span> /
+// <span class="math display">) and only then pulls the library from our own
+// origin. A page without formulas never downloads it, and no third-party script
+// runs on an OJ page (a compromised CDN could read the CSRF token).
 //
 // Rendering only those nodes also keeps KaTeX away from code blocks, where $ has
-// no business being math. If the CDN is unreachable the raw TeX stays on screen,
+// no business being math. If an asset is missing the raw TeX stays on screen,
 // still readable, so nothing depends on this script succeeding.
 (function () {
-  var CDN = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/";
+  var BASE = "/static/";
 
   function mathNodes() {
     return document.querySelectorAll("span.math");
@@ -36,9 +37,9 @@
     if (mathNodes().length === 0) return;
     var css = document.createElement("link");
     css.rel = "stylesheet";
-    css.href = CDN + "katex.min.css";
+    css.href = BASE + "katex.min.css";
     var js = document.createElement("script");
-    js.src = CDN + "katex.min.js";
+    js.src = BASE + "katex.min.js";
     js.onload = render;
     document.head.appendChild(css);
     document.head.appendChild(js);

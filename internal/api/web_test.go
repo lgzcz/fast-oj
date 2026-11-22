@@ -396,13 +396,15 @@ func TestProblemListViewForBrowsers(t *testing.T) {
 			t.Errorf("list page missing %q", want)
 		}
 	}
-	// KaTeX is ~300 KB and this page has no formula on it, so the page must not
-	// reference the CDN at all: math.js pulls it only when a math node exists.
+	// KaTeX is ~1.5 MB with fonts, and this page has no formula on it, so the page
+	// must not reference it at all: math.js pulls the local copies only when a math
+	// node exists.
 	if strings.Contains(body, "katex") {
-		t.Error("a formula-free page still loaded the KaTeX CDN")
+		t.Error("a formula-free page still loaded KaTeX")
 	}
-	if code, math := h.htmlGet("/static/math.js", ""); code != http.StatusOK || !strings.Contains(math, "katex@0.16.11") {
-		t.Errorf("math.js lost the on-demand loader (%d)", code)
+	if code, math := h.htmlGet("/static/math.js", ""); code != http.StatusOK ||
+		!strings.Contains(math, `/static/katex.min.js`) || strings.Contains(math, "cdn.jsdelivr.net") {
+		t.Errorf("math.js should load KaTeX from this origin (%d)", code)
 	}
 	// A hidden problem is invisible to an anonymous browser, visible to admin.
 	if strings.Contains(body, "P4001") {
@@ -676,18 +678,25 @@ func TestHTMLNotFoundAndStaticAssets(t *testing.T) {
 	}
 
 	for path, want := range map[string]string{
-		"/static/style.css": "body {",
-		"/static/math.js":   "span.math",
+		"/static/style.css":     "body {",
+		"/static/math.js":       "span.math",
+		"/static/katex.min.js":  "katex",
+		"/static/katex.min.css": "KaTeX_Main-Regular.woff2",
 	} {
 		code, body := h.htmlGet(path, "")
 		if code != http.StatusOK || !strings.Contains(body, want) {
 			t.Fatalf("%s = %d", path, code)
 		}
 	}
+	// 字体是二进制，按字体类型发，不能按 js/css 拒掉。
+	code, _, fontHdr := h.html(http.MethodGet, "/static/KaTeX_Main-Regular.woff2", "", nil, "")
+	if code != http.StatusOK || fontHdr.Get("Content-Type") != "font/woff2" {
+		t.Fatalf("font asset = %d, type %q", code, fontHdr.Get("Content-Type"))
+	}
 	if code, _ := h.htmlGet("/static/style.css.exe", ""); code != http.StatusNotFound {
 		t.Fatalf("odd asset suffix = %d", code)
 	}
-	// Only the two known files are served; no directory listing or traversal.
+	// 只发已知后缀的文件；没有目录列表，也没有路径穿越。
 	if code, _ := h.htmlGet("/static/", ""); code != http.StatusNotFound {
 		t.Fatalf("static root = %d", code)
 	}
