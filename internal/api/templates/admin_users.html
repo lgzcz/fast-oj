@@ -24,4 +24,51 @@
   {{end}}
 </table>
 </div>
+
+{{if .Data.CanPerm}}
+<h2>批量授权</h2>
+{{if .Data.NeedStepUp}}
+<p class="flash">批量改权限也要先把你的密码再输一遍（与单人页同一道 2 分钟身份确认）。</p>
+<form class="row" method="post" action="/admin/perms/unlock">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <input type="hidden" name="next" value="/admin/perms">
+  <div style="flex: 1 1 18rem">
+    <label>你的密码</label>
+    <input type="password" name="step_up" autocomplete="current-password" required>
+  </div>
+  <input type="submit" value="确认身份">
+</form>
+{{else}}
+<form method="post" action="/admin/perms/batch">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <div class="row">
+    <div style="flex: 1 1 20rem">
+      <label>用户名（一行一个，或用逗号/空格分开，最多 {{.Data.MaxBatch}} 个）</label>
+      <textarea name="handles" rows="4" spellcheck="false" autocomplete="off" placeholder="alice&#10;bob&#10;carol"></textarea>
+    </div>
+    <div>
+      <label>权限</label>
+      <select name="key">
+        {{range .Data.AllPerms}}<option value="{{.Key}}">{{.Key}} — {{.Label}}</option>{{end}}
+      </select>
+    </div>
+    <div>
+      <label>动作</label>
+      <select name="action">
+        <option value="grant">授予</option>
+        <option value="revoke">收回</option>
+        <option value="clear">恢复默认</option>
+      </select>
+    </div>
+    <div>
+      <label>有效天数（留空=永久，只对授予生效）</label>
+      <input type="number" name="days" min="1" max="3650" placeholder="永久">
+    </div>
+  </div>
+  <p><input type="submit" value="执行批量授权"></p>
+</form>
+<p class="meta">整批要么全部成功要么全部不动；你自己、超级管理员、已注销账号会被跳过并在结果里点名。
+  收回与恢复默认立即生效且没有到期时间。</p>
+{{end}}
+{{end}}
 {{end}}

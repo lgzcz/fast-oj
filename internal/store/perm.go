@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 )
 
 // Permission is one capability the system can grant.
@@ -44,10 +45,12 @@ func (db *DB) EffectivePermissions(ctx context.Context, userID int64, role strin
 	rows, err := db.SQL.QueryContext(ctx,
 		`SELECT key, 1 AS src, 1 AS granted FROM role_permissions WHERE role=?
 		 UNION ALL
-		 SELECT key, 2 AS src, granted FROM user_permissions WHERE user_id=?
+		 SELECT key, 2 AS src, granted FROM user_permissions
+		  WHERE user_id=? AND (granted=0 OR expires_at=0 OR expires_at>?)
 		 UNION ALL
 		 SELECT p.key, 3 AS src, 1 AS granted
-		   FROM permissions p JOIN site_owner o ON o.id=1 AND o.user_id=?`, role, userID, userID)
+		   FROM permissions p JOIN site_owner o ON o.id=1 AND o.user_id=?`,
+		role, userID, nowMS(), userID)
 	if err != nil {
 		return nil, err
 	}
@@ -93,6 +96,10 @@ type UserGrant struct {
 	ByRole    bool   `json:"by_role"`
 	Override  *bool  `json:"override,omitempty"`
 	Effective bool   `json:"effective"`
+	// ExpiresAt 是这条单独授予的到期时刻（毫秒，0=永久）；Expired 表示它已经过期，
+	// 因此 Effective 不算它，但这一行仍留着让管理员看得见并清理。
+	ExpiresAt int64 `json:"expires_at,omitempty"`
+	Expired   bool  `json:"expired,omitempty"`
 }
 
 func (db *DB) UserGrants(ctx context.Context, userID int64, role string) ([]UserGrant, error) {
@@ -116,12 +123,20 @@ func (db *DB) UserGrants(ctx context.Context, userID int64, role string) ([]User
 	}
 
 	out := make([]UserGrant, 0, len(perms))
+	now := nowMS()
 	for _, p := range perms {
 		g := UserGrant{Key: p.Key, Label: p.Label, Staff: p.Staff, ByRole: roleSet[p.Key]}
 		if v, ok := overrides[p.Key]; ok {
-			val := v
+			val := v.granted
 			g.Override = &val
-			g.Effective = v
+			g.ExpiresAt = v.expiresAt
+			switch {
+			case v.granted && v.expiresAt > 0 && v.expiresAt <= now:
+				g.Expired = true
+				g.Effective = g.ByRole
+			default:
+				g.Effective = v.granted
+			}
 		} else {
 			g.Effective = g.ByRole
 		}
@@ -151,23 +166,30 @@ func (db *DB) permissionsByRole(ctx context.Context, role string) (map[string]bo
 	return out, rows.Err()
 }
 
-func (db *DB) userOverrides(ctx context.Context, userID int64) (map[string]bool, error) {
-	rows, err := db.SQL.QueryContext(ctx, `SELECT key, granted FROM user_permissions WHERE user_id=?`, userID)
+type permOverride struct {
+	granted   bool
+	expiresAt int64
+}
+
+func (db *DB) userOverrides(ctx context.Context, userID int64) (map[string]permOverride, error) {
+	rows, err := db.SQL.QueryContext(ctx,
+		`SELECT key, granted, IFNULL(expires_at, 0) FROM user_permissions WHERE user_id=?`, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	out := map[string]bool{}
+	out := map[string]permOverride{}
 	for rows.Next() {
 		var (
 			key     string
 			granted int
+			expires int64
 		)
-		if err := rows.Scan(&key, &granted); err != nil {
+		if err := rows.Scan(&key, &granted, &expires); err != nil {
 			return nil, err
 		}
-		out[key] = granted != 0
+		out[key] = permOverride{granted: granted != 0, expiresAt: expires}
 	}
 	return out, rows.Err()
 }
@@ -186,22 +208,76 @@ func (db *DB) HasEffectiveStaffPermission(ctx context.Context, userID int64, rol
 		       AND NOT EXISTS (SELECT 1 FROM user_permissions up
 		                        WHERE up.user_id=? AND up.key=p.key AND up.granted=0))
 		      OR EXISTS (SELECT 1 FROM user_permissions up
-		                  WHERE up.user_id=? AND up.key=p.key AND up.granted=1)
+		                  WHERE up.user_id=? AND up.key=p.key AND up.granted=1
+		                    AND (up.expires_at=0 OR up.expires_at>?))
 		    )
-		 )`, role, userID, userID).Scan(&n)
+		 )`, role, userID, userID, nowMS()).Scan(&n)
 	if err != nil {
 		return false, err
 	}
 	return n != 0, nil
 }
 
-// SetUserPermission records an explicit grant or removal. Unknown keys fail
-// rather than silently doing nothing, so a typo cannot look like a successful
-// privilege change.
+// SetUserPermission records an explicit grant or removal that does not expire.
+// Unknown keys fail rather than silently doing nothing, so a typo cannot look like
+// a successful privilege change.
 func (db *DB) SetUserPermission(ctx context.Context, userID int64, key string, granted bool) error {
+	return db.SetUserPermissionUntil(ctx, userID, key, granted, 0)
+}
+
+// SetUserPermissionUntil is SetUserPermission with an expiry for grants. expiresAt
+// is a millisecond timestamp, 0 = never. A removal is always permanent: a "deny"
+// that silently lapses one day is not something an administrator can reason about.
+func (db *DB) SetUserPermissionUntil(ctx context.Context, userID int64, key string, granted bool, expiresAt int64) error {
 	if err := db.guardMutable(ctx, userID); err != nil {
 		return err
 	}
+	if err := db.permissionKnown(ctx, key); err != nil {
+		return err
+	}
+	if !granted || expiresAt < 0 {
+		expiresAt = 0
+	}
+	_, err := db.SQL.ExecContext(ctx,
+		`INSERT INTO user_permissions (user_id, key, granted, expires_at) VALUES (?, ?, ?, ?)
+		 ON CONFLICT(user_id, key) DO UPDATE SET granted=excluded.granted, expires_at=excluded.expires_at`,
+		userID, key, boolInt(granted), expiresAt)
+	return err
+}
+
+// SetUserPermissions grants or revokes one key for a batch of accounts. Every
+// target is checked first (owner and cancelled accounts are refused), then the
+// whole batch lands in one transaction: a class list is all-or-nothing rather
+// than "the first 17 got it".
+func (db *DB) SetUserPermissions(ctx context.Context, userIDs []int64, key string, granted bool, expiresAt int64) (int, error) {
+	if err := db.permissionKnown(ctx, key); err != nil {
+		return 0, err
+	}
+	for _, id := range userIDs {
+		if err := db.guardMutable(ctx, id); err != nil {
+			return 0, err
+		}
+	}
+	if !granted || expiresAt < 0 {
+		expiresAt = 0
+	}
+	n := 0
+	err := db.InTx(ctx, func(tx *sql.Tx) error {
+		for _, id := range userIDs {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO user_permissions (user_id, key, granted, expires_at) VALUES (?, ?, ?, ?)
+				 ON CONFLICT(user_id, key) DO UPDATE SET granted=excluded.granted, expires_at=excluded.expires_at`,
+				id, key, boolInt(granted), expiresAt); err != nil {
+				return err
+			}
+			n++
+		}
+		return nil
+	})
+	return n, err
+}
+
+func (db *DB) permissionKnown(ctx context.Context, key string) error {
 	var n int
 	if err := db.SQL.QueryRowContext(ctx, `SELECT COUNT(*) FROM permissions WHERE key=?`, key).Scan(&n); err != nil {
 		return err
@@ -209,11 +285,35 @@ func (db *DB) SetUserPermission(ctx context.Context, userID int64, key string, g
 	if n == 0 {
 		return ErrNotFound
 	}
-	_, err := db.SQL.ExecContext(ctx,
-		`INSERT INTO user_permissions (user_id, key, granted) VALUES (?, ?, ?)
-		 ON CONFLICT(user_id, key) DO UPDATE SET granted=excluded.granted`,
-		userID, key, boolInt(granted))
-	return err
+	return nil
+}
+
+// ClearUserPermissions removes one override from a batch of accounts, returning
+// them to whatever their role says.
+func (db *DB) ClearUserPermissions(ctx context.Context, userIDs []int64, key string) (int, error) {
+	if err := db.permissionKnown(ctx, key); err != nil {
+		return 0, err
+	}
+	for _, id := range userIDs {
+		if err := db.guardMutable(ctx, id); err != nil {
+			return 0, err
+		}
+	}
+	n := 0
+	err := db.InTx(ctx, func(tx *sql.Tx) error {
+		for _, id := range userIDs {
+			res, err := tx.ExecContext(ctx,
+				`DELETE FROM user_permissions WHERE user_id=? AND key=?`, id, key)
+			if err != nil {
+				return err
+			}
+			if k, _ := res.RowsAffected(); k > 0 {
+				n++
+			}
+		}
+		return nil
+	})
+	return n, err
 }
 
 // ClearUserPermission drops the override, returning the user to their tier default.

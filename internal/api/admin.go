@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/liangbinchen2013/fast-oj/internal/store"
 )
@@ -52,8 +54,17 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 			Owner: u.ID == ownerID,
 		})
 	}
+	var allPerms []store.Permission
+	if a.can(permPermissionManage) {
+		if allPerms, err = s.db.ListPermissions(r.Context()); err != nil {
+			s.writeStoreError(w, r, err)
+			return
+		}
+	}
 	s.page(w, r, http.StatusOK, "权限管理", "admin_users", a.viewer(), msgOf(r), map[string]any{
 		"Users": rows, "Self": a.User.ID,
+		"CanPerm": a.can(permPermissionManage), "NeedStepUp": !stepUpOK(a),
+		"AllPerms": allPerms, "MaxBatch": maxBatchSize,
 	})
 }
 
@@ -64,7 +75,15 @@ type grantRow struct {
 	ByRole    bool
 	Override  string // "", "granted", "removed"
 	Effective bool
+	// Expires 是授予的到期时刻（空=永久），Expired 表示它已经过了而不再生效。
+	Expires string
+	Expired bool
 }
+
+const (
+	maxPermDays  = 3650
+	maxBatchSize = 100
+)
 
 func (s *Server) handleAdminUser(w http.ResponseWriter, r *http.Request) {
 	a, ok := s.requireAnyPerm(w, r, permPermissionManage, permUserManage)
@@ -149,7 +168,8 @@ func (s *Server) loadGrantView(r *http.Request) (store.User, []store.UserGrant, 
 		}
 		rows = append(rows, grantRow{
 			Key: g.Key, Label: g.Label, Staff: g.Staff, ByRole: g.ByRole,
-			Override: override, Effective: g.Effective,
+			Override: override, Effective: g.Effective, Expired: g.Expired,
+			Expires: permissionExpiryText(g.ExpiresAt),
 		})
 	}
 	return u, grants, rows, nil
@@ -282,10 +302,18 @@ func (s *Server) handleAdminPermChange(w http.ResponseWriter, r *http.Request) {
 	if !s.requireStepUp(w, r, a, back, "权限") {
 		return
 	}
+	expiresAt := int64(0)
+	if action == "grant" {
+		var bad string
+		if expiresAt, bad = permExpiryFromDays(r); bad != "" {
+			s.respondError(w, r, http.StatusBadRequest, bad)
+			return
+		}
+	}
 
 	switch action {
 	case "grant", "revoke":
-		if err := s.db.SetUserPermission(r.Context(), target.ID, key, action == "grant"); err != nil {
+		if err := s.db.SetUserPermissionUntil(r.Context(), target.ID, key, action == "grant", expiresAt); err != nil {
 			if err == store.ErrNotFound {
 				s.respondError(w, r, http.StatusBadRequest, "没有这个权限项："+key)
 				return
@@ -305,8 +333,149 @@ func (s *Server) handleAdminPermChange(w http.ResponseWriter, r *http.Request) {
 	s.log.Info("permission changed", "by", a.User.Handle, "target", target.Handle, "key", key, "action", action)
 	// action 只能是 grant / revoke / clear（上面那个 switch 已经把住了），所以拼出来的
 	// 动作键是这三条之一，不是表单里随便填的文本。
-	s.audit(r, a, "perm."+action, target.Handle, key)
+	detail := key
+	if action == "grant" && expiresAt > 0 {
+		detail += "（至 " + permissionExpiryText(expiresAt) + "）"
+	}
+	s.audit(r, a, "perm."+action, target.Handle, detail)
 	http.Redirect(w, r, back+"?msg="+url.QueryEscape(fmt.Sprintf("%s → %s", target.Handle, key)), http.StatusSeeOther)
+}
+
+func permissionExpiryText(ms int64) string {
+	if ms <= 0 {
+		return ""
+	}
+	return time.UnixMilli(ms).Local().Format("2006-01-02 15:04")
+}
+
+// permExpiryFromDays 把表单里的"有效天数"变成到期时刻。留空是永久；超过十年
+// 其实就等于永久，但让操作员自己写清楚比悄悄截断好。
+func permExpiryFromDays(r *http.Request) (int64, string) {
+	raw := strings.TrimSpace(r.FormValue("days"))
+	if raw == "" {
+		return 0, ""
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 1 || n > maxPermDays {
+		return 0, fmt.Sprintf("有效期要填 1..%d 天，留空表示永久", maxPermDays)
+	}
+	return time.Now().Add(time.Duration(n) * 24 * time.Hour).UnixMilli(), ""
+}
+
+// handleAdminPermBatch 给一个班一次授权：一行一个（或逗号/空格分开）用户名，
+// 同一项能力、同一个到期时间。与单人页共用 requireStepUp 与 guardMutable，
+// 所以自己、超级管理员、已注销账号都在这里被跳过而不是被悄悄改掉。
+func (s *Server) handleAdminPermBatch(w http.ResponseWriter, r *http.Request) {
+	a, ok := s.requirePerm(w, r, permPermissionManage)
+	if !ok {
+		return
+	}
+	if !s.requireStepUp(w, r, a, "/admin/perms", "批量授权") {
+		return
+	}
+	key := strings.TrimSpace(r.FormValue("key"))
+	action := strings.TrimSpace(r.FormValue("action"))
+	if action != "grant" && action != "revoke" && action != "clear" {
+		s.respondError(w, r, http.StatusBadRequest, "action 只能是 grant / revoke / clear")
+		return
+	}
+	expiresAt := int64(0)
+	if action == "grant" {
+		var bad string
+		if expiresAt, bad = permExpiryFromDays(r); bad != "" {
+			s.respondError(w, r, http.StatusBadRequest, bad)
+			return
+		}
+	}
+	handles := splitHandleList(r.FormValue("handles"))
+	if len(handles) == 0 {
+		http.Redirect(w, r, "/admin/perms?msg="+url.QueryEscape("先填用户名，一行一个或用逗号/空格分开"), http.StatusSeeOther)
+		return
+	}
+	if len(handles) > maxBatchSize {
+		s.respondError(w, r, http.StatusBadRequest,
+			fmt.Sprintf("一次最多 %d 个账号，把名单分成几批", maxBatchSize))
+		return
+	}
+	ownerID, err := s.db.OwnerID(r.Context())
+	if err != nil {
+		s.writeStoreError(w, r, err)
+		return
+	}
+	ids := make([]int64, 0, len(handles))
+	var skipped []string
+	for _, h := range handles {
+		u, err := s.db.GetUserByHandle(r.Context(), h)
+		if err != nil || u.ID == a.User.ID || u.ID == ownerID {
+			skipped = append(skipped, h)
+			continue
+		}
+		ids = append(ids, u.ID)
+	}
+	if len(ids) == 0 {
+		http.Redirect(w, r, "/admin/perms?msg="+url.QueryEscape(
+			"没有可改的账号：名单里的账号不存在、是你自己，或者是超级管理员"), http.StatusSeeOther)
+		return
+	}
+	var n int
+	switch action {
+	case "grant", "revoke":
+		n, err = s.db.SetUserPermissions(r.Context(), ids, key, action == "grant", expiresAt)
+	case "clear":
+		n, err = s.db.ClearUserPermissions(r.Context(), ids, key)
+	}
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			s.respondError(w, r, http.StatusBadRequest, "没有这个权限项："+key)
+			return
+		}
+		s.writeStoreError(w, r, err)
+		return
+	}
+	actionText := map[string]string{"grant": "授予", "revoke": "收回", "clear": "恢复默认"}[action]
+	detail := fmt.Sprintf("%s → %d 个账号", key, n)
+	if action == "grant" && expiresAt > 0 {
+		detail += "，至 " + permissionExpiryText(expiresAt)
+	}
+	s.log.Info("permission batch", "by", a.User.Handle, "key", key, "action", action, "n", n)
+	s.audit(r, a, "perm.batch_"+action, key, detail)
+	msg := fmt.Sprintf("%s %s：改了 %d 个账号", actionText, key, n)
+	if len(skipped) > 0 {
+		names := skipped
+		if len(names) > 5 {
+			names = names[:5]
+		}
+		msg += fmt.Sprintf("；跳过 %d 个（%s", len(skipped), strings.Join(names, "、"))
+		if len(skipped) > len(names) {
+			msg += "…"
+		}
+		msg += "）"
+	}
+	http.Redirect(w, r, "/admin/perms?msg="+url.QueryEscape(msg), http.StatusSeeOther)
+}
+
+// splitHandleList 接受换行、空格、英文/中文逗号与分号；去重按大小写不敏感，
+// 因为用户名在库里就是 COLLATE NOCASE 的唯一键。
+func splitHandleList(raw string) []string {
+	fields := strings.FieldsFunc(raw, func(r rune) bool {
+		switch r {
+		case ',', '，', ';', '；', '\n', '\r', '\t', ' ':
+			return true
+		}
+		return false
+	})
+	out := make([]string, 0, len(fields))
+	seen := map[string]bool{}
+	for _, f := range fields {
+		f = strings.TrimSpace(f)
+		low := strings.ToLower(f)
+		if f == "" || seen[low] {
+			continue
+		}
+		seen[low] = true
+		out = append(out, f)
+	}
+	return out
 }
 
 // handleAdminRoleChange 改的是"这个人属于哪一档"，而 admin 这一档的基线是全部能力位。

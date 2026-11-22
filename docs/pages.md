@@ -83,7 +83,8 @@
 | `GET` | `/admin/perms` | `permission.manage` 或 `user.manage` | 账号列表（带积分那一列）与权限控制台 |
 | `GET` | `/admin/perms/u/{handle}` | `permission.manage` 或 `user.manage` | 单个账号：权限矩阵、标签、名字颜色、角色与状态（没确认身份时改不了要命的那几项） |
 | `POST` | `/admin/perms/unlock` | `permission.manage` 或 `user.manage` | 再输一次自己的密码，换取 2 分钟之内改权限的资格 |
-| `POST` | `/admin/perms/u/{handle}` | `permission.manage` | 授予 / 收回 / 恢复默认（不能改自己；要先确认身份） |
+| `POST` | `/admin/perms/u/{handle}` | `permission.manage` | 授予 / 收回 / 恢复默认（不能改自己；要先确认身份）。授予可带 `days=1..3650`，留空永久 |
+| `POST` | `/admin/perms/batch` | `permission.manage` | 批量授予 / 收回 / 恢复默认（≤100 个用户名；整批一个事务；要先确认身份） |
 | `POST` | `/admin/users/{handle}/role` | `user.manage` | 改角色（要先确认身份） |
 | `POST` | `/admin/users/{handle}/status` | `user.manage` | 封禁 / 解封（封禁踢掉会话；要先确认身份） |
 | `POST` | `/admin/users/{handle}/tags` | `user.manage` | 改名字后面的标签，形如 `admin [作弊者]`（最多 3 个、每个 12 字；不进那道身份确认） |

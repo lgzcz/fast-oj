@@ -40,6 +40,8 @@
 <p class="meta">确认之后，下面的按钮才会出现；没确认时这一页只读。</p>
 {{end}}
 
+<p class="meta">表里的「收回 / 恢复默认」立即生效；「授予」旁边的天数留空就是永久，填了就在到期后自动失效
+  （收回没有到期时间，避免一个人某天悄悄拿回角色自带的权限）。</p>
 <div class="table-scroll" role="region" aria-label="数据表格" tabindex="0">
 <table>
   <tr><th>权限</th><th>含义</th><th>角色自带</th><th>单独设置</th><th>生效</th><th></th></tr>
@@ -48,7 +50,7 @@
     <td><code>{{.Key}}</code></td>
     <td>{{.Label}}{{if .Staff}} <span class="hidden">管理侧</span>{{end}}</td>
     <td>{{if .ByRole}}是{{else}}—{{end}}</td>
-    <td>{{if eq .Override "granted"}}授予{{else if eq .Override "removed"}}收回{{else}}—{{end}}</td>
+    <td>{{if eq .Override "granted"}}授予{{if .Expires}}（至 {{.Expires}}）{{else}}（永久）{{end}}{{if .Expired}} <span class="badge warn">已过期</span>{{end}}{{else if eq .Override "removed"}}收回{{else}}—{{end}}</td>
     <td><span class="badge {{if .Effective}}AC{{else}}WA{{end}}">{{if .Effective}}有{{else}}无{{end}}</span></td>
     <td>
       {{if and $.Data.CanPerm (not $.Data.Self) (not $.Data.Owner) (not $.Data.NeedStepUp)}}
@@ -56,7 +58,8 @@
         <input type="hidden" name="csrf" value="{{$.Me.CSRF}}">
         <input type="hidden" name="key" value="{{.Key}}">
         {{if .Effective}}<button type="submit" name="action" value="revoke">收回</button>
-        {{else}}<button type="submit" name="action" value="grant">授予</button>{{end}}
+        {{else}}<input type="number" name="days" min="1" max="3650" placeholder="永久" style="width:5.5rem" title="有效天数，留空=永久">
+        <button type="submit" name="action" value="grant">授予</button>{{end}}
         {{if .Override}}· <button type="submit" name="action" value="clear">恢复默认</button>{{end}}
       </form>
       {{end}}

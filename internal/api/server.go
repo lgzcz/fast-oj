@@ -201,6 +201,8 @@ func (s *Server) Handler() http.Handler {
 	// 改权限、改角色、改状态、注销账号之前的一次身份再确认：密码只写在这个会话上，2 分钟有效。
 	mux.HandleFunc("POST /admin/perms/unlock", s.handleStepUpUnlock)
 	mux.HandleFunc("POST /admin/perms/u/{handle}", s.handleAdminPermChange)
+	// 批量授权：一个班一次，同一项能力同一个到期时间。
+	mux.HandleFunc("POST /admin/perms/batch", s.handleAdminPermBatch)
 	mux.HandleFunc("POST /admin/users/{handle}/role", s.handleAdminRoleChange)
 	mux.HandleFunc("POST /admin/users/{handle}/status", s.handleAdminStatusChange)
 	// 标签：别人怎么称呼这个人。要 user.manage，但不进那道 2 分钟身份确认（见 admin.go）。
@@ -339,6 +341,7 @@ func (s *Server) handleAbout(w http.ResponseWriter, r *http.Request) {
 		"  POST /admin/ips/unban/{ip}  解封",
 		"  GET  /admin/audit            安全审计流水（ip.manage）：谁在什么时候动了谁的权限、账号、题目与站点设置；只读、只追加",
 		"  POST /admin/perms/u/{handle}  授予/撤销/清除单项能力（要 2 分钟内确认过身份）",
+		"  POST /admin/perms/batch       批量授予/收回/恢复默认；可带有效天数（留空=永久）",
 		"  POST /admin/perms/unlock      改权限、改角色、改状态、注销之前的身份再确认：密码只写在这个会话上",
 		"  POST /admin/users/{handle}/role|status  改角色 / 封禁解禁（超级管理员除外）",
 		"  POST /admin/users/{handle}/cancel  注销账号：抹掉身份、释放用户名，记录留着署名成封禁用户",
