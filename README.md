@@ -113,6 +113,7 @@ curl -s localhost:8080/healthz          # ok
 | [查重](docs/plagiarism.md) | 查重：同题相似度口径与"只报告不处罚" |
 | [两步验证与登录设备](docs/security.md) | 两步验证：TOTP、恢复码、登录设备与 Passkey 口径 |
 | [Rating、虚拟比赛与周赛](docs/rating.md) | Rating 结算、虚拟比赛与周赛收集页 |
+| [对抗赛（Battle）](docs/battles.md) | 对抗赛：一道题的短时 PK，与未做 Hack 的边界 |
 | [判题方式：普通比较 / SPJ 判题器 / 交互题](docs/judging.md) | 判题方式：普通比较 / SPJ 判题器 / 交互题 |
 | [Python 提交：护栏装在解释器里，边界还是牢房](docs/python.md) | Python 提交：解释器护栏与牢房边界 |
 | [比赛（限时 + 独立榜 + 加入码 + 队伍，OI/IOI/ACM 三种赛制）](docs/contests.md) | 比赛：限时、独立榜、加入码、队伍、OI/IOI/ACM 三赛制 |

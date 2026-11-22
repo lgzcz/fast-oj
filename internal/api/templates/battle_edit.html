@@ -1,0 +1,36 @@
+{{define "content"}}
+<h1>新建对抗赛</h1>
+<p class="meta">围绕一道公开题，在时间窗内比谁得分高；提交是普通练习提交。</p>
+
+{{if .Data.Errors}}
+<div class="flash">{{range .Data.Errors}}<p>{{.}}</p>{{end}}</div>
+{{end}}
+
+<form method="post" action="{{.Data.Action}}">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <label>标题</label>
+  <input type="text" name="title" value="{{.Data.Title}}" maxlength="100" required>
+
+  <div class="row">
+    <div>
+      <label>题目编号</label>
+      <input type="text" name="problem" value="{{.Data.Problem}}" maxlength="32" autocomplete="off" spellcheck="false" required>
+    </div>
+    <div>
+      <label>开始时间</label>
+      <input type="datetime-local" name="start_at" value="{{.Data.StartText}}" required step="60">
+    </div>
+    <div>
+      <label>结束时间</label>
+      <input type="datetime-local" name="end_at" value="{{.Data.EndText}}" required step="60">
+    </div>
+  </div>
+
+  <label class="check">
+    <input type="checkbox" name="visible" value="1" {{if .Data.Visible}}checked{{end}}>
+    出现在对抗赛列表（不勾只有发起人与比赛管理员看得到）
+  </label>
+
+  <p><input type="submit" value="创建对抗"></p>
+</form>
+{{end}}

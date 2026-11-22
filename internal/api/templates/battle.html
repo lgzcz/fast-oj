@@ -1,0 +1,47 @@
+{{define "content"}}
+<h1>{{.Data.Title}}</h1>
+<p class="meta">
+  <span class="badge {{.Data.PhaseClass}}">{{.Data.Phase}}</span>
+  题目 <a href="/problems/{{.Data.PID}}">{{.Data.PID}}</a> {{.Data.ProblemName}}
+  · {{.Data.Window}} · {{.Data.Countdown}} · {{.Data.People}} 人
+  {{if .Data.OwnerHandle}} · 发起人 <a href="/u/{{.Data.OwnerHandle}}">{{.Data.Owner}}</a>{{else}} · 发起人 {{.Data.Owner}}{{end}}
+</p>
+
+<p class="meta">
+  {{if .Data.CanJoin}}<form class="inline" method="post" action="/battles/{{.Data.ID}}/join">
+    <input type="hidden" name="csrf" value="{{.Me.CSRF}}"><button type="submit">加入对抗</button></form>{{end}}
+  {{if .Data.CanLeave}}<form class="inline" method="post" action="/battles/{{.Data.ID}}/leave">
+    <input type="hidden" name="csrf" value="{{.Me.CSRF}}"><button type="submit">退出</button></form>{{end}}
+  {{if not .Data.SignedIn}}<a href="/login?next=/battles/{{.Data.ID}}">登录后可以加入</a>{{end}}
+</p>
+
+<h2>榜</h2>
+<div class="table-scroll" role="region" aria-label="对抗榜" tabindex="0">
+<table>
+  <tr><th class="num">名次</th><th>选手</th><th class="num">最好得分</th><th class="num">提交</th><th>状态</th></tr>
+  {{range .Data.Rows}}
+  <tr>
+    <td class="num">{{.Rank}}</td>
+    <td><a class="pt-{{.Color}}" href="/u/{{.Handle}}">{{.Name}}</a>{{if .IsMe}} <span class="meta">（你）</span>{{end}}</td>
+    <td class="num">{{.Best}} / {{$.Data.Max}}</td>
+    <td class="num">{{.Attempts}}</td>
+    <td>{{if .Solved}}<span class="status status-solved">AC</span>{{else}}<span class="status status-untried">未通过</span>{{end}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="5">还没有人加入。</td></tr>
+  {{end}}
+</table>
+</div>
+<p class="meta">成绩按开始之后、结束之前在这道题上的普通提交现算；刷新页面即可更新。
+  目前只做 PK，不执行 Hack 用例。</p>
+
+{{if .Data.CanDelete}}
+<form method="post" action="/battles/{{.Data.ID}}/delete"
+      onsubmit="return confirm('删掉这场对抗？加入记录会一起没，提交不受影响。')">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <button type="submit" class="danger">删除对抗赛</button>
+</form>
+{{end}}
+
+<p class="meta"><a href="/battles">所有对抗赛 →</a></p>
+{{end}}

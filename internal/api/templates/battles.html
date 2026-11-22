@@ -1,0 +1,22 @@
+{{define "content"}}
+<h1>对抗赛</h1>
+<p class="meta">围绕一道题的短时 PK：窗口内的练习提交按最好得分排名，不进正式比赛榜，也不参与 rating。{{if .Data.CanHost}}<a href="/battles/new">发起对抗</a>{{end}}</p>
+
+<div class="table-scroll" role="region" aria-label="对抗赛列表" tabindex="0">
+<table>
+  <tr><th>标题</th><th>题目</th><th>状态</th><th>时间</th><th class="num">人数</th><th>发起人</th></tr>
+  {{range .Data.Rows}}
+  <tr>
+    <td><a href="/battles/{{.ID}}">{{.Title}}</a>{{if .Joined}} <span class="badge">已加入</span>{{end}}{{if not .Visible}} <span class="hidden">未公开</span>{{end}}</td>
+    <td><a href="/problems/{{.PID}}">{{.PID}}</a> {{.ProblemName}}</td>
+    <td><span class="badge {{.PhaseClass}}">{{.Phase}}</span></td>
+    <td>{{.Start}} —— {{.End}}</td>
+    <td class="num">{{.People}}</td>
+    <td>{{if .OwnerHandle}}<a href="/u/{{.OwnerHandle}}">{{.Owner}}</a>{{else}}{{.Owner}}{{end}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="6">还没有对抗赛。</td></tr>
+  {{end}}
+</table>
+</div>
+{{end}}

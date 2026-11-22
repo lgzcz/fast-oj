@@ -56,6 +56,11 @@
 | `GET` | `/weekly` | 公开 | host 标成「周赛」的比赛汇总；不自动排期 |
 | `POST` | `/contests/{key}/virtual/start` | 比赛成员或主办方 | 用已结束比赛的原时长开一场虚拟赛 |
 | `GET` `/POST` | `/virtual` `/virtual/{id}` `/virtual/{id}/finish` | 登录用户（仅自己的） | 虚拟比赛列表、成绩页与提前结束 |
+| `GET` | `/battles` | 公开（未公开对抗限发起人） | 对抗赛列表 |
+| `GET` `/POST` | `/battles/new` `/battles` | `contest.create` | 发起对抗（一道公开题 + 起止时间） |
+| `GET` | `/battles/{id}` | 公开 | 对抗榜：窗口内最好得分与提交次数 |
+| `POST` | `/battles/{id}/join` `/leave` | 登录用户 / 已加入 | 加入（结束前）/ 退出（结束前） |
+| `POST` | `/battles/{id}/delete` | 发起人或 `contest.manage.any` | 删对抗（不动题目与提交） |
 | `GET` | `/topics` | 公开 | 社区贴列表（统一管理页），`?q=` `?after=` `?limit=`；登录后每行带上「你能删」的删除按钮 |
 | `GET` `/POST` | `/topics/new` `/topics` | 登录用户 | 发帖：类型（求助 / 社区）、标题、正文（可预览）、题号 |
 | `GET` | `/topics/{id}` | 公开 | 帖子正文与评论；未登录只能看 |

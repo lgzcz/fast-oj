@@ -213,6 +213,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /contests/{key}/virtual/start", s.handleVirtualStart)
 
 	mux.HandleFunc("GET /weekly", s.handleWeekly)
+
+	mux.HandleFunc("GET /battles", s.handleBattleList)
+	mux.HandleFunc("GET /battles/new", s.handleBattleNew)
+	mux.HandleFunc("POST /battles", s.handleBattleCreate)
+	mux.HandleFunc("GET /battles/{id}", s.handleBattleGet)
+	mux.HandleFunc("POST /battles/{id}/join", s.handleBattleJoin)
+	mux.HandleFunc("POST /battles/{id}/leave", s.handleBattleLeave)
+	mux.HandleFunc("POST /battles/{id}/delete", s.handleBattleDelete)
 	mux.HandleFunc("GET /virtual", s.handleVirtualList)
 	mux.HandleFunc("GET /virtual/{id}", s.handleVirtualGet)
 	mux.HandleFunc("POST /virtual/{id}/finish", s.handleVirtualFinish)
