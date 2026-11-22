@@ -20,6 +20,11 @@
   他的权限、角色和状态只有他自己能动；名字颜色可以自己改。</p>
 {{end}}
 
+{{if and .Data.CanUser .Data.TargetStaff (not .Data.CanPerm) (not .Data.Self) (not .Data.Owner)}}
+<p class="flash">这个账号持有<b>管理侧权限</b>：封禁或注销他要 <code>permission.manage</code>。
+  你手上的 <code>user.manage</code> 只够处置普通用户，这一页对他的状态与注销是只读的。</p>
+{{end}}
+
 {{if and .Data.NeedStepUp (not .Data.Self) (not .Data.Owner)}}
 <h2>先确认是你本人</h2>
 <p class="flash">改权限、角色、状态或注销账号都要先把你的密码再输一遍。<b>确认一次管 2 分钟</b>，
@@ -110,7 +115,7 @@
   <code>permission.manage</code>；只负责封禁、改名与注销的管理员改不了这里。</p>
 {{end}}
 
-{{if and (not .Data.Self) (not .Data.Owner) (not .Data.NeedStepUp) .Data.CanUser}}
+{{if and (not .Data.Self) (not .Data.Owner) (not .Data.NeedStepUp) .Data.CanUser .Data.CanPunish}}
 <h2>状态</h2>
 <form class="row" method="post" action="/admin/users/{{.Data.Target.Handle}}/status">
   <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
@@ -124,7 +129,7 @@
 </form>
 {{end}}
 
-{{if and (not .Data.Self) (not .Data.Owner) (not .Data.Cancelled) (not .Data.NeedStepUp)}}
+{{if and (not .Data.Self) (not .Data.Owner) (not .Data.Cancelled) (not .Data.NeedStepUp) .Data.CanUser .Data.CanPunish}}
 <h2>注销这个账号</h2>
 <p class="meta">抹掉<b>身份</b>：用户名、邮箱、密码、昵称、简介全部清空，这个用户名马上可以
   被下一个人注册。<b>行为记录一条都不删</b>：他的提交、判题结果、动态、帖子、评论都还在，

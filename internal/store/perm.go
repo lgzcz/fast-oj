@@ -172,6 +172,29 @@ func (db *DB) userOverrides(ctx context.Context, userID int64) (map[string]bool,
 	return out, rows.Err()
 }
 
+// HasEffectiveStaffPermission reports whether the account still holds at least one
+// staff capability after per-user overrides are applied. The permission console uses
+// it to keep a user.manage delegate from banning or cancelling someone who ranks
+// above them; the site owner is refused earlier by the caller.
+func (db *DB) HasEffectiveStaffPermission(ctx context.Context, userID int64, role string) (bool, error) {
+	var n int
+	err := db.SQL.QueryRowContext(ctx,
+		`SELECT EXISTS (
+		   SELECT 1 FROM permissions p
+		    WHERE p.staff=1 AND (
+		      (EXISTS (SELECT 1 FROM role_permissions rp WHERE rp.role=? AND rp.key=p.key)
+		       AND NOT EXISTS (SELECT 1 FROM user_permissions up
+		                        WHERE up.user_id=? AND up.key=p.key AND up.granted=0))
+		      OR EXISTS (SELECT 1 FROM user_permissions up
+		                  WHERE up.user_id=? AND up.key=p.key AND up.granted=1)
+		    )
+		 )`, role, userID, userID).Scan(&n)
+	if err != nil {
+		return false, err
+	}
+	return n != 0, nil
+}
+
 // SetUserPermission records an explicit grant or removal. Unknown keys fail
 // rather than silently doing nothing, so a typo cannot look like a successful
 // privilege change.

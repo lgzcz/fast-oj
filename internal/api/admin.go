@@ -81,6 +81,15 @@ func (s *Server) handleAdminUser(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, r, err)
 		return
 	}
+	// 层级：目标身上还留着一项管理侧能力，就不再是 user.manage 能处置的人。
+	// 这一页据此决定状态与注销两段摆不摆出来；写入口另有 guardTargetSeniority。
+	targetStaff := false
+	for _, g := range rows {
+		if g.Staff && g.Effective {
+			targetStaff = true
+			break
+		}
+	}
 	s.page(w, r, http.StatusOK, "权限 · "+u.Handle, "admin_user", a.viewer(), msgOf(r), map[string]any{
 		"Target":   u,
 		"Grants":   rows,
@@ -98,6 +107,10 @@ func (s *Server) handleAdminUser(w http.ResponseWriter, r *http.Request) {
 		// 能力的一种（admin 档等于全部能力），所以两者同一把钥匙；标签、状态、注销
 		// 仍然只需要 user.manage。
 		"CanPerm": a.can(permPermissionManage),
+		// CanPunish 是封禁与注销那两段：普通用户 user.manage 就够，工作人员必须
+		// permission.manage——不能让人靠 user.manage 把管着自己的人踢掉。
+		"CanPunish":   a.can(permPermissionManage) || !targetStaff,
+		"TargetStaff": targetStaff,
 		// 标签给的是原文（逗号分隔），管理员看到的输入框就是他自己上次写的那样。
 		"Tags":       u.Tags,
 		"MaxTags":    store.MaxTags,
@@ -170,6 +183,26 @@ func (s *Server) adminTarget(w http.ResponseWriter, r *http.Request, a actor) (s
 	return u, true
 }
 
+// guardTargetSeniority keeps user.manage from becoming a path to the people above
+// it: banning or cancelling staff is a permission.manage action, while an ordinary
+// student stays fair game. adminTarget has already refused self and the owner.
+func (s *Server) guardTargetSeniority(w http.ResponseWriter, r *http.Request, a actor, target store.User) bool {
+	if a.can(permPermissionManage) {
+		return true
+	}
+	staff, err := s.db.HasEffectiveStaffPermission(r.Context(), target.ID, target.Role)
+	if err != nil {
+		s.writeStoreError(w, r, err)
+		return false
+	}
+	if staff {
+		s.respondError(w, r, http.StatusForbidden,
+			"这个账号持有管理侧权限：封禁或注销管理员需要 "+permPermissionManage)
+		return false
+	}
+	return true
+}
+
 // handleAdminCancel is 注销账号: the identity is erased and the login name freed for
 // the next registrant, while every record the account produced stays and is shown as
 // coming from 封禁用户.
@@ -183,6 +216,9 @@ func (s *Server) handleAdminCancel(w http.ResponseWriter, r *http.Request) {
 	}
 	target, ok := s.adminTarget(w, r, a)
 	if !ok {
+		return
+	}
+	if !s.guardTargetSeniority(w, r, a, target) {
 		return
 	}
 	back := "/admin/perms/u/" + url.PathEscape(target.Handle)
@@ -305,6 +341,9 @@ func (s *Server) handleAdminStatusChange(w http.ResponseWriter, r *http.Request)
 	}
 	target, ok := s.adminTarget(w, r, a)
 	if !ok {
+		return
+	}
+	if !s.guardTargetSeniority(w, r, a, target) {
 		return
 	}
 	status := strings.TrimSpace(r.FormValue("status"))

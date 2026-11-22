@@ -370,6 +370,70 @@ func TestRoleChangeNeedsPermissionManage(t *testing.T) {
 	}
 }
 
+// user.manage 能处置普通用户，但够不着管理侧的人：封禁/注销工作人员要
+// permission.manage。否则被委派"管用户"的账号可以反过来踢掉管着自己的人。
+func TestUserManagerCannotPunishStaff(t *testing.T) {
+	h := newHarness(t)
+	h.author("plain8")
+	h.author("staff8", permStatsView)
+	h.author("boss8")
+	if code, body := h.postBearer("/admin/users/boss8/role",
+		url.Values{"role": {"admin"}}, h.adminToken()); code != http.StatusOK {
+		t.Fatalf("提成 admin = %d %s", code, short(body))
+	}
+	moderator := h.author("moder8", permUserManage)
+
+	// 普通学生：user.manage 就够了。
+	h.unlock(moderator, "/admin/perms/u/plain8")
+	if code, body := h.postAs(moderator, "/admin/users/plain8/status",
+		url.Values{"status": {"banned"}}); code != http.StatusOK {
+		t.Fatalf("封禁普通用户 = %d %s", code, short(body))
+	}
+
+	// 持单项管理侧能力的人：封禁与注销都要 permission.manage。
+	h.unlock(moderator, "/admin/perms/u/staff8")
+	if code, body := h.postAs(moderator, "/admin/users/staff8/status",
+		url.Values{"status": {"banned"}}); code != http.StatusForbidden {
+		t.Fatalf("封禁工作人员 = %d %s", code, short(body))
+	}
+	if code, body := h.postAs(moderator, "/admin/users/staff8/cancel",
+		url.Values{"confirm": {"staff8"}}); code != http.StatusForbidden {
+		t.Fatalf("注销工作人员 = %d %s", code, short(body))
+	}
+	// 角色是 admin 的更不必说。
+	h.unlock(moderator, "/admin/perms/u/boss8")
+	if code, _ := h.postAs(moderator, "/admin/users/boss8/status",
+		url.Values{"status": {"banned"}}); code != http.StatusForbidden {
+		t.Fatalf("封禁 admin = %d", code)
+	}
+	if code, _ := h.postAs(moderator, "/admin/users/boss8/cancel",
+		url.Values{"confirm": {"boss8"}}); code != http.StatusForbidden {
+		t.Fatalf("注销 admin = %d", code)
+	}
+	if h.user("staff8").Status != "active" || h.user("boss8").Status != "active" || h.user("boss8").Role != "admin" {
+		t.Fatalf("被拒的操作改了库：staff8=%+v boss8=%+v", h.user("staff8"), h.user("boss8"))
+	}
+
+	// 页面上也不该摆出按了必然 403 的按钮；普通用户那一页照旧。
+	h.unlock(moderator, "/admin/perms/u/staff8")
+	if _, page := h.getAs(moderator, "/admin/perms/u/staff8"); strings.Contains(page,
+		`action="/admin/users/staff8/status"`) || strings.Contains(page,
+		`action="/admin/users/staff8/cancel"`) {
+		t.Errorf("user.manage 在工作人员页上仍看到封禁/注销表单：\n%s", short(page))
+	}
+	if _, page := h.getAs(moderator, "/admin/perms/u/plain8"); !strings.Contains(page,
+		`action="/admin/users/plain8/status"`) || !strings.Contains(page,
+		`action="/admin/users/plain8/cancel"`) {
+		t.Errorf("普通用户页上少了封禁/注销表单：\n%s", short(page))
+	}
+
+	// permission.manage 持有者（这里用站主令牌）仍然可以处置工作人员。
+	if code, body := h.postBearer("/admin/users/staff8/status",
+		url.Values{"status": {"banned"}}, h.adminToken()); code != http.StatusOK {
+		t.Fatalf("站主封禁工作人员 = %d %s", code, short(body))
+	}
+}
+
 func TestJudgeViewRight(t *testing.T) {
 	h := newHarness(t)
 	watcher := h.author("watcher7")
