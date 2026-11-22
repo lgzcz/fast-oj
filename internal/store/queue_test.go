@@ -3,8 +3,11 @@ package store
 import (
 	"context"
 	"errors"
+	"io"
+	"log/slog"
 	"sync"
 	"testing"
+	"time"
 )
 
 func queueFixture(t *testing.T) (*DB, User, Problem, Judge) {
@@ -226,6 +229,66 @@ func TestReapLeavesFreshWorkAlone(t *testing.T) {
 	}
 	if row, _ := db.GetSubmission(ctx, s.ID); row.Status != "compiling" {
 		t.Fatalf("row = %+v", row)
+	}
+}
+
+// 进度回报就是判机的"我还活着"：它必须把 started_at 推到当前，否则一个跑得久的
+// 合法提交会在租约到期时被误判成判机死亡。
+func TestReportProgressRefreshesLease(t *testing.T) {
+	ctx := context.Background()
+	db, u, p, j := queueFixture(t)
+	s := submitSomething(t, db, u, p, "x")
+	if _, err := db.ClaimNext(ctx, j.ID, CapsAll); err != nil {
+		t.Fatal(err)
+	}
+	old := nowMS() - 3600_000
+	if _, err := db.SQL.ExecContext(ctx, `UPDATE submissions SET started_at=? WHERE id=?`, old, s.ID); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := db.ReportStatus(ctx, s.ID, j.ID, "compiling", "running", "case 1"); err != nil || !ok {
+		t.Fatalf("progress = %v %v", ok, err)
+	}
+	row, err := db.GetSubmission(ctx, s.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row.StartedAt <= old {
+		t.Fatalf("progress did not refresh started_at: old=%d got=%d", old, row.StartedAt)
+	}
+	if n, err := db.ReapStale(ctx, 60_000); err != nil || n != 0 {
+		t.Fatalf("fresh progress reaped: %d %v", n, err)
+	}
+}
+
+// 接线层：ticker 真的会把过期租约收掉，而不只是 ReapStale 函数本身正确。
+func TestRunReaperAbandonsExpired(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	db, u, p, j := queueFixture(t)
+	s := submitSomething(t, db, u, p, "x")
+	if _, err := db.ClaimNext(ctx, j.ID, CapsAll); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.SQL.ExecContext(ctx,
+		`UPDATE submissions SET started_at=? WHERE id=?`, nowMS()-3600_000, s.ID); err != nil {
+		t.Fatal(err)
+	}
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	go db.RunReaper(ctx, 10*time.Millisecond, time.Millisecond, log)
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		row, err := db.GetSubmission(ctx, s.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if row.Status == "abandoned" && row.Verdict == "IE" {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("reaper did not abandon the row: %+v", row)
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 }
 

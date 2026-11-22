@@ -69,6 +69,10 @@ func run() error {
 	// 挂在同一个 ctx 上，收到信号就和 HTTP 一起停。
 	go app.RunPoints(ctx)
 
+	// 判机租约：每次进度回报都会刷新 started_at，所以 5 分钟没消息就认为判机死了。
+	// 不接这班岗，判机崩溃后提交会永远停在 compiling/running（见 docs/judge-protocol.md）。
+	go db.RunReaper(ctx, 30*time.Second, 5*time.Minute, log)
+
 	ln, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {
 		return fmt.Errorf("listen %s: %w", cfg.Addr, err)

@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
+	"time"
 )
 
 // ClaimedTask is everything a judge box needs to start work on one submission.
@@ -119,9 +121,9 @@ func (db *DB) ReportProgress(ctx context.Context, submissionID, judgeID int64, f
 	err := db.InTx(ctx, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx,
 			`UPDATE submissions
-			 SET status=?, detail=CASE WHEN ?='' THEN detail ELSE ? END
+			 SET status=?, started_at=?, detail=CASE WHEN ?='' THEN detail ELSE ? END
 			 WHERE id=? AND judge_id=? AND status=?`,
-			to, detail, detail, submissionID, judgeID, from)
+			to, nowMS(), detail, detail, submissionID, judgeID, from)
 		if err != nil {
 			return err
 		}
@@ -158,6 +160,40 @@ func (db *DB) ReapStale(ctx context.Context, leaseMS int64) (int64, error) {
 	}
 	n, _ := res.RowsAffected()
 	return n, nil
+}
+
+// RunReaper periodically abandons in-flight submissions whose judge stopped
+// reporting. Every ReportProgress refreshes started_at, so the lease measures
+// "time since the judge last said anything", not total judging time.
+func (db *DB) RunReaper(ctx context.Context, every, lease time.Duration, log *slog.Logger) {
+	if every <= 0 {
+		every = 30 * time.Second
+	}
+	if lease <= 0 {
+		lease = 5 * time.Minute
+	}
+	if log == nil {
+		log = slog.Default()
+	}
+	ticker := time.NewTicker(every)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			n, err := db.ReapStale(ctx, lease.Milliseconds())
+			if err != nil {
+				if ctx.Err() == nil {
+					log.Error("reap stale submissions failed", "err", err)
+				}
+				continue
+			}
+			if n > 0 {
+				log.Warn("reaped stale submissions", "count", n, "lease", lease.String())
+			}
+		}
+	}
 }
 
 // RequeueAbandoned puts an abandoned row back at the tail of the queue.
