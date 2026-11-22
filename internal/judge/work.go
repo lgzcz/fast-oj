@@ -168,6 +168,14 @@ func Judge(task Task, tool Tool, dir string, drop *DropTo, onProgress Progress) 
 	}
 
 	if tool.Compiles() {
+		// 页面上的“C++17 · O2 开”必须就是真正用的那一条命令行；源码里的
+		// #pragma GCC optimize/target 会把它改掉，先在这里拒掉。
+		if line, text := forbiddenCompileDirective(task.Source); line > 0 {
+			rep.Verdict = CE
+			rep.Detail = compilePolicyError(line, text, rep.Toolchain)
+			rep.FailedCase = "compile"
+			return rep
+		}
 		build := Run(tool.CompileArgs(userDir), userDir, nil, compileLimitsFor(drop))
 		if build.Exit != 0 {
 			rep.Verdict = CE
