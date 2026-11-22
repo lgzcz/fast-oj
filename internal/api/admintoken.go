@@ -75,8 +75,10 @@ func (s *Server) settleAdminToken(r *http.Request, status int) {
 	next, spent, err := s.db.SpendAdminToken(ctx, token, r.Method+" "+r.URL.Path)
 	if err != nil || !spent {
 		// 两个请求同时用同一枚时会有一个先烧掉：另一个的动作已经完成了，只能把这件事
-		// 如实记下来——这一枚在此刻之后不再有效。
-		s.log.Warn("operator token spent late", "err", err)
+		// 如实记下来——这一枚在此刻之后不再有效。这比固定令牌好得多，但不是严格的
+		// "恰好一次"；会同时发两次的只可能是拿着同一枚令牌的人自己。
+		s.log.Warn("operator token spent late: the action already ran, this token is now dead",
+			"err", err, "method", r.Method, "path", r.URL.Path, "ip", clientIP(r))
 		return
 	}
 	if err := s.db.ClearLoginFailures(ctx, key); err != nil {
