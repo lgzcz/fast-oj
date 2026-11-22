@@ -77,7 +77,7 @@ func (db *DB) ClaimNext(ctx context.Context, judgeID int64, caps Caps) (ClaimedT
 	var status string
 	err := db.SQL.QueryRowContext(ctx,
 		`UPDATE submissions
-		 SET status='compiling', judge_id=?, started_at=?
+		 SET status='compiling', judge_id=?, started_at=?, attempts=attempts+1
 		 WHERE id = (SELECT s.id FROM submissions s
 		   WHERE s.status='queued'
 		     AND (s.options='' OR ?)
@@ -159,19 +159,68 @@ func (db *DB) ReportProgress(ctx context.Context, submissionID, judgeID int64, f
 	return true, nil
 }
 
-// ReapStale marks in-flight submissions that no judge is working on any more as
-// abandoned, so a dead judge box cannot wedge the queue forever.
+// MaxJudgeAttempts is how many judge boxes may claim one submission before a
+// lease that keeps dying is treated as "this job kills its judge" and abandoned.
+// Three is enough to ride out a box rebooting mid-run; an unbounded retry would
+// let one pathological submission take every box down in turn.
+const MaxJudgeAttempts = 3
+
+// ReapStale is the failover half of multi-judge operation: a box that claimed a
+// job and then went silent does not own the result. If the submission still has
+// attempts left it goes back to the shared queue (any live box can claim it),
+// with the dead attempt's case rows deleted; only after MaxJudgeAttempts does it
+// become abandoned/IE. Returns how many rows were requeued or abandoned.
 func (db *DB) ReapStale(ctx context.Context, leaseMS int64) (int64, error) {
-	res, err := db.SQL.ExecContext(ctx,
-		`UPDATE submissions SET status='abandoned', verdict='IE', detail=?
-		 WHERE status IN ('compiling','running') AND started_at IS NOT NULL
-		   AND started_at < ?`,
-		"judge lease expired", nowMS()-leaseMS)
-	if err != nil {
-		return 0, err
-	}
-	n, _ := res.RowsAffected()
-	return n, nil
+	var moved int64
+	err := db.InTx(ctx, func(tx *sql.Tx) error {
+		type staleRow struct {
+			id       int64
+			attempts int
+		}
+		rows, err := tx.QueryContext(ctx,
+			`SELECT id, attempts FROM submissions
+			 WHERE status IN ('compiling','running') AND started_at IS NOT NULL AND started_at < ?`,
+			nowMS()-leaseMS)
+		if err != nil {
+			return err
+		}
+		var stale []staleRow
+		for rows.Next() {
+			var s staleRow
+			if err := rows.Scan(&s.id, &s.attempts); err != nil {
+				rows.Close()
+				return err
+			}
+			stale = append(stale, s)
+		}
+		if err := rows.Close(); err != nil {
+			return err
+		}
+		for _, s := range stale {
+			if s.attempts < MaxJudgeAttempts {
+				if _, err := tx.ExecContext(ctx,
+					`UPDATE submissions SET status='queued', verdict='', judge_id=NULL, detail=?,
+					        time_ms=-1, mem_kb=-1, time_min=0, mem_min=0, score=0, failed_case='',
+					        toolchain='', started_at=NULL, judged_at=NULL
+					 WHERE id=?`,
+					fmt.Sprintf("判机失联，已重新排队（已用 %d 次机会）", s.attempts), s.id); err != nil {
+					return err
+				}
+				if _, err := tx.ExecContext(ctx, `DELETE FROM runs WHERE submission_id=?`, s.id); err != nil {
+					return err
+				}
+			} else {
+				if _, err := tx.ExecContext(ctx,
+					`UPDATE submissions SET status='abandoned', verdict='IE', detail=? WHERE id=?`,
+					fmt.Sprintf("判机连续 %d 次失联，已放弃重试", s.attempts), s.id); err != nil {
+					return err
+				}
+			}
+			moved++
+		}
+		return nil
+	})
+	return moved, err
 }
 
 // RunReaper periodically abandons in-flight submissions whose judge stopped
@@ -223,7 +272,7 @@ func (db *DB) RequeueAbandoned(ctx context.Context, submissionID int64) (bool, e
 	err := db.InTx(ctx, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx,
 			`UPDATE submissions SET status='queued', verdict='', judge_id=NULL, detail='',
-			           time_ms=-1, mem_kb=-1, score=0, started_at=NULL, judged_at=NULL
+			           time_ms=-1, mem_kb=-1, score=0, started_at=NULL, judged_at=NULL, attempts=0
 			 WHERE id=? AND status='abandoned'`, submissionID)
 		if err != nil {
 			return err
@@ -260,7 +309,7 @@ func (db *DB) Rejudge(ctx context.Context, submissionID int64) (bool, error) {
 		res, err := tx.ExecContext(ctx,
 			`UPDATE submissions SET status='queued', verdict='', judge_id=NULL, detail='',
 			           time_ms=-1, mem_kb=-1, time_min=0, mem_min=0, score=0, failed_case='',
-			           toolchain='', started_at=NULL, judged_at=NULL
+			           toolchain='', started_at=NULL, judged_at=NULL, attempts=0
 			 WHERE id=? AND status<>'queued'`, submissionID)
 		if err != nil {
 			return err

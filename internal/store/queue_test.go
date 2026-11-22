@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -178,34 +179,60 @@ func TestReapStaleAndRequeue(t *testing.T) {
 	ctx := context.Background()
 	db, u, p, j := queueFixture(t)
 	s := submitSomething(t, db, u, p, "x")
-	if _, err := db.ClaimNext(ctx, j.ID, CapsAll); err != nil {
-		t.Fatal(err)
-	}
-	// Simulate a judge box that died an hour ago.
-	if _, err := db.SQL.ExecContext(ctx,
-		`UPDATE submissions SET started_at=? WHERE id=?`, nowMS()-3600_000, s.ID); err != nil {
-		t.Fatal(err)
+	stale := func() {
+		t.Helper()
+		if _, err := db.ClaimNext(ctx, j.ID, CapsAll); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.SQL.ExecContext(ctx,
+			`UPDATE submissions SET started_at=? WHERE id=?`, nowMS()-3600_000, s.ID); err != nil {
+			t.Fatal(err)
+		}
 	}
 
-	n, err := db.ReapStale(ctx, 60_000)
-	if err != nil || n != 1 {
-		t.Fatalf("reaped = %d %v", n, err)
+	// 前两次失联：自动回到共享队列，别的判机（或重启后的同一台）能再领。
+	for i := 0; i < 2; i++ {
+		stale()
+		n, err := db.ReapStale(ctx, 60_000)
+		if err != nil || n != 1 {
+			t.Fatalf("第 %d 次 reaped = %d %v", i+1, n, err)
+		}
+		row, err := db.GetSubmission(ctx, s.ID)
+		if err != nil || row.Status != "queued" || row.Verdict != "" || row.JudgeID != 0 || row.StartedAt != 0 {
+			t.Fatalf("第 %d 次 requeued row = %+v %v", i+1, row, err)
+		}
+		if pending, err := db.PendingCount(ctx); err != nil || pending != 1 {
+			t.Fatalf("pending after requeue = %d %v", pending, err)
+		}
+	}
+
+	// 第三次用完机会：不再无限重派，落成 abandoned/IE。
+	stale()
+	if n, err := db.ReapStale(ctx, 60_000); err != nil || n != 1 {
+		t.Fatalf("final reap = %d %v", n, err)
 	}
 	row, err := db.GetSubmission(ctx, s.ID)
 	if err != nil || row.Status != "abandoned" || row.Verdict != "IE" {
-		t.Fatalf("reaped row = %+v %v", row, err)
+		t.Fatalf("exhausted row = %+v %v", row, err)
 	}
-	// A reaped row is out of the pending queue.
+	if _, detail, err := db.SubmissionPayload(ctx, s.ID); err != nil || !strings.Contains(detail, "放弃") {
+		t.Errorf("detail = %q %v", detail, err)
+	}
 	if pending, err := db.PendingCount(ctx); err != nil || pending != 0 {
-		t.Fatalf("pending after reap = %d %v", pending, err)
+		t.Fatalf("pending after abandon = %d %v", pending, err)
 	}
 
+	// 管理员手动重排给一次全新的机会：attempts 归零。
 	if ok, err := db.RequeueAbandoned(ctx, s.ID); err != nil || !ok {
 		t.Fatalf("requeue = %v %v", ok, err)
 	}
 	row, err = db.GetSubmission(ctx, s.ID)
 	if err != nil || row.Status != "queued" || row.Verdict != "" || row.JudgeID != 0 || row.StartedAt != 0 {
 		t.Fatalf("requeued row = %+v %v", row, err)
+	}
+	var attempts int
+	if err := db.SQL.QueryRowContext(ctx, `SELECT attempts FROM submissions WHERE id=?`, s.ID).Scan(&attempts); err != nil || attempts != 0 {
+		t.Errorf("manual requeue attempts = %d %v", attempts, err)
 	}
 	// Requeueing a settled row must fail; only abandoned rows go back.
 	if err := db.RecordResult(ctx, s.ID, Result{Verdict: "AC", TimeMS: 1, MemKB: 1, Score: 1, TotalScore: 1}, nil); err != nil {
@@ -270,7 +297,8 @@ func TestRunReaperAbandonsExpired(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := db.SQL.ExecContext(ctx,
-		`UPDATE submissions SET started_at=? WHERE id=?`, nowMS()-3600_000, s.ID); err != nil {
+		`UPDATE submissions SET started_at=?, attempts=? WHERE id=?`,
+		nowMS()-3600_000, MaxJudgeAttempts, s.ID); err != nil {
 		t.Fatal(err)
 	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
