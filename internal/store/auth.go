@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"errors"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -321,6 +322,37 @@ func (db *DB) PruneExpired(ctx context.Context) (int64, error) {
 	}
 	n, _ := res.RowsAffected()
 	return n, nil
+}
+
+// RunSessionPruner deletes expired session rows on a slow ticker. Correctness never
+// depended on it (every lookup filters on expires_at), but without a sweep the table
+// grows forever: one row per login, one login per browser session.
+func (db *DB) RunSessionPruner(ctx context.Context, every time.Duration, log *slog.Logger) {
+	if every <= 0 {
+		every = 24 * time.Hour
+	}
+	if log == nil {
+		log = slog.Default()
+	}
+	ticker := time.NewTicker(every)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			n, err := db.PruneExpired(ctx)
+			if err != nil {
+				if ctx.Err() == nil {
+					log.Error("prune expired sessions failed", "err", err)
+				}
+				continue
+			}
+			if n > 0 {
+				log.Info("pruned expired sessions", "count", n)
+			}
+		}
+	}
 }
 
 // --- 通用速率限制 ---

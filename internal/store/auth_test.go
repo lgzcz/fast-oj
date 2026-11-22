@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"errors"
+	"io"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -236,6 +238,60 @@ func TestSessionLastSeenIsThrottled(t *testing.T) {
 	if got := seen(); got != fresh {
 		t.Fatalf("紧接着的第二次请求又写了：%d -> %d", fresh, got)
 	}
+}
+
+// 过期会话的正确性不靠清理（查询自带 expires_at），但表不能只长不消。
+func TestRunSessionPrunerDeletesOnlyExpired(t *testing.T) {
+	ctx := context.Background()
+	db := openTestDB(t)
+	u, err := db.CreateAccount(ctx, AccountInput{
+		Handle: "pruner", Email: "pruner@example.com", Password: "correct-horse-battery", Cost: 4,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	live, err := db.CreateSession(ctx, u.ID, "10.0.0.1", "ua", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dead, err := db.CreateSession(ctx, u.ID, "10.0.0.2", "ua", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.SQL.ExecContext(ctx,
+		`UPDATE sessions SET expires_at=? WHERE id=?`, nowMS()-1, dead.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	runCtx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() {
+		db.RunSessionPruner(runCtx, 10*time.Millisecond,
+			slog.New(slog.NewTextHandler(io.Discard, nil)))
+		close(done)
+	}()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		var n int
+		if err := db.SQL.QueryRowContext(ctx,
+			`SELECT COUNT(*) FROM sessions WHERE id=?`, dead.ID).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if n == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			cancel()
+			<-done
+			t.Fatal("过期会话一直没被清掉")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if _, _, err := db.SessionUser(ctx, live.ID); err != nil {
+		t.Errorf("清理误伤了未过期会话：%v", err)
+	}
+	cancel()
+	<-done
 }
 
 func TestDisabledAccountCannotUseSessionOrLogin(t *testing.T) {
