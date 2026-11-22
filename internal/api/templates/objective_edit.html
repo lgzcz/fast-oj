@@ -1,0 +1,35 @@
+{{define "content"}}
+<h1>{{if .Data.Title}}编辑客观题{{else}}新建客观题{{end}}</h1>
+<p class="meta">说明与题目都在这一页。题目每行一道，格式：
+  <code>题目|选项A|选项B|选项C|答案字母</code>。选项 2..8 个，答案写 A..H；每题 1 分。</p>
+
+{{if .Data.Errors}}
+<div class="flash">
+  {{range .Data.Errors}}<p>{{.}}</p>{{end}}
+</div>
+{{end}}
+
+<form method="post" action="{{.Data.Action}}">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <div class="row">
+    <div style="flex:1 1 24rem">
+      <label>标题</label>
+      <input type="text" name="title" value="{{.Data.Title}}" maxlength="200" required>
+    </div>
+    <div>
+      <label>发布</label>
+      <label class="check"><input type="checkbox" name="visible" value="1" {{if .Data.Visible}}checked{{end}}> 所有人可见（不勾只有你与题目管理员能看到）</label>
+    </div>
+  </div>
+
+  <label>说明（可空，支持 Markdown 与 <code>$KaTeX$</code>）</label>
+  <textarea name="body" rows="6" maxlength="32768" spellcheck="false">{{.Data.Body}}</textarea>
+
+  <label>题目</label>
+  <textarea name="questions" rows="10" spellcheck="false" autocomplete="off"
+            placeholder="1+1 等于几？|1|2|3|B&#10;HTTP 默认端口是？|80|443|22|A">{{.Data.Raw}}</textarea>
+  <p><input type="submit" value="保存"></p>
+</form>
+
+<p class="meta">编辑会整组替换题目；已有作答记录保留，并按新题重新判分。</p>
+{{end}}

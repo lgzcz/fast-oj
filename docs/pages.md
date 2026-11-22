@@ -24,6 +24,12 @@
 | `POST` | `/problems/{key}/attachments` | 该题 owner 或 `problem.edit.any` | 传附件（PDF / 图片 / zip / 文本，单文件 ≤ 16MB，每题 20 个） |
 | `POST` | `/problems/{key}/attachments/{id}/delete` | 同上 | 删一个附件（连带落盘文件） |
 | `POST` | `/problems/{key}/submit` | 登录用户 | 网页表单提交 |
+| `GET` | `/objective` | 公开 | 客观题列表；未发布的只对作者与 `problem.edit.any` 出现 |
+| `GET` `/POST` | `/objective/new` `/objective` | `problem.create` | 建一套单选自测（题目每行 `题目\|选项\|…\|答案字母`） |
+| `GET` | `/objective/{id}` | 公开（未发布限作者） | 读题；登录后出现作答表单 |
+| `POST` | `/objective/{id}/answer` | 登录用户 | 交卷：服务端即时判分，记录得分与次数 |
+| `GET` `/POST` | `/objective/{id}/edit` `/objective/{id}` | 作者或 `problem.edit.any` | 改题 / 保存（整组替换题目） |
+| `POST` | `/objective/{id}/delete` | 作者或 `problem.edit.any` | 删题（题目与作答记录一起没） |
 | `GET` | `/trainings` | 公开 | 题单列表，`?q=` `?after=` `?limit=`；未公开题单只对作者与 `problem.edit.any` 出现 |
 | `GET` `/POST` | `/trainings/new` `/trainings` | 登录用户 | 建题单（标题、说明、是否公开） |
 | `GET` | `/trainings/{id}` | 公开（未公开题单限作者） | 题单正文与题目表；登录后显示每题 AC 状态与完成度 |

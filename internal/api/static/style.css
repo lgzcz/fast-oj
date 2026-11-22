@@ -398,3 +398,6 @@ body[data-page=settings] main > form > label:first-of-type { margin-top: 0; }
 .poll-option { margin: .6rem 0; }
 .poll .bar { height: .5rem; background: var(--code); border-radius: 3px; overflow: hidden; margin: .3rem 0 .2rem; }
 .poll .bar span { display: block; height: 100%; background: var(--accent); }
+.objective-q { border: 1px solid var(--line); border-radius: var(--radius); padding: .75rem 1rem; margin: 1rem 0; background: var(--surface); }
+.objective-q legend { padding: 0 .35rem; font-weight: 600; }
+.objective-options { margin: .25rem 0 0 1.25rem; }

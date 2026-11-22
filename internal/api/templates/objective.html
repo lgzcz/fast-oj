@@ -1,0 +1,60 @@
+{{define "content"}}
+<h1>{{.Data.Title}}</h1>
+<p class="meta">
+  {{if .Data.OwnerHandle}}作者 <a href="/u/{{.Data.OwnerHandle}}">{{.Data.Owner}}</a>{{else}}作者 {{.Data.Owner}}{{end}}
+  · 共 {{.Data.MaxScore}} 题，每题 1 分
+  {{if not .Data.Visible}} · <span class="hidden">未公开</span>{{end}}
+  {{if .Data.CanEdit}} · <a href="/objective/{{.Data.ID}}/edit">编辑</a>{{end}}
+</p>
+
+{{if .Data.Body}}<article class="post-body">{{markdown .Data.Body}}</article>{{end}}
+
+{{if .Data.Attempt}}
+<p class="meta">上次得分 <b>{{.Data.Attempt.Score}} / {{.Data.Attempt.Total}}</b>
+  · 第 {{.Data.Attempt.Attempts}} 次作答 · {{.Data.Attempt.When}}
+  {{if .Data.ShowResult}} · 本次已交卷{{end}}</p>
+{{end}}
+
+{{if .Data.Questions}}
+<form method="post" action="/objective/{{.Data.ID}}/answer">
+  {{if $.Me}}<input type="hidden" name="csrf" value="{{.Me.CSRF}}">{{end}}
+  {{range .Data.Questions}}
+  {{$q := .}}
+  <fieldset class="objective-q">
+    <legend>{{.Ordinal}}. {{.Prompt}}
+      {{if $.Data.ShowResult}}
+      <span class="badge {{if .Correct}}AC{{else}}WA{{end}}">{{if .Correct}}答对{{else}}答错：你选 {{.Chosen}}，正确 {{.Answer}}{{end}}</span>
+      {{end}}
+    </legend>
+    {{if $.Data.SignedIn}}
+    {{range $i, $o := .Options}}
+    <label class="check">
+      <input type="radio" name="q{{$q.Ordinal}}" value="{{$i}}" {{if $o.Selected}}checked{{end}}>
+      <b>{{$o.Letter}}</b>. {{$o.Text}}
+    </label>
+    {{end}}
+    {{else}}
+    <ol class="objective-options">
+      {{range .Options}}<li><b>{{.Letter}}</b>. {{.Text}}</li>{{end}}
+    </ol>
+    {{end}}
+  </fieldset>
+  {{end}}
+  {{if .Data.SignedIn}}
+  <p><input type="submit" value="{{if .Data.ShowResult}}再交一次{{else}}交卷判分{{end}}"></p>
+  {{else}}
+  <p class="meta"><a href="/login?next=/objective/{{.Data.ID}}">登录</a> 后才能作答；未登录可以读题。</p>
+  {{end}}
+</form>
+{{end}}
+
+{{if .Data.CanDelete}}
+<form method="post" action="/objective/{{.Data.ID}}/delete"
+      onsubmit="return confirm('删掉这套客观题？题目与作答记录会一起没。')">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <button type="submit" class="danger">删除客观题</button>
+</form>
+{{end}}
+
+<p class="meta"><a href="/objective">所有客观题 →</a></p>
+{{end}}

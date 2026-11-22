@@ -1,0 +1,22 @@
+{{define "content"}}
+<h1>客观题</h1>
+<p class="meta">单选自测：交卷后服务端立即判分，每题 1 分。不计比赛、不计 Rating，也不占用判机。
+  {{if .Data.CanCreate}}<a href="/objective/new">出一套 →</a>{{end}}
+</p>
+
+<div class="table-scroll" role="region" aria-label="客观题列表" tabindex="0">
+<table>
+  <tr><th>标题</th><th class="num">题数</th><th>作者</th><th>发布</th></tr>
+  {{range .Data.Rows}}
+  <tr>
+    <td><a href="/objective/{{.ID}}">{{.Title}}</a>{{if not .Visible}} <span class="hidden">未公开</span>{{end}}{{if .CanEdit}} · <a href="/objective/{{.ID}}/edit">编辑</a>{{end}}</td>
+    <td class="num">{{.Questions}}</td>
+    <td>{{if .OwnerHandle}}<a href="/u/{{.OwnerHandle}}">{{.Owner}}</a>{{else}}{{.Owner}}{{end}}</td>
+    <td>{{.When}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="4">还没有客观题。</td></tr>
+  {{end}}
+</table>
+</div>
+{{end}}

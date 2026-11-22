@@ -149,6 +149,15 @@ func (s *Server) Handler() http.Handler {
 	})
 
 	// 题单：登录用户都能建，作者（或 problem.edit.any）维护其中的题。
+	mux.HandleFunc("GET /objective", s.handleObjectiveList)
+	mux.HandleFunc("GET /objective/new", s.handleObjectiveNew)
+	mux.HandleFunc("POST /objective", s.handleObjectiveCreate)
+	mux.HandleFunc("GET /objective/{id}", s.handleObjectiveGet)
+	mux.HandleFunc("POST /objective/{id}", s.handleObjectiveUpdate)
+	mux.HandleFunc("POST /objective/{id}/answer", s.handleObjectiveAnswer)
+	mux.HandleFunc("GET /objective/{id}/edit", s.handleObjectiveEdit)
+	mux.HandleFunc("POST /objective/{id}/delete", s.handleObjectiveDelete)
+
 	mux.HandleFunc("GET /trainings", s.handleTrainingList)
 	mux.HandleFunc("GET /trainings/new", s.handleTrainingNew)
 	mux.HandleFunc("POST /trainings", s.handleTrainingCreate)
@@ -429,6 +438,7 @@ func (s *Server) handleAbout(w http.ResponseWriter, r *http.Request) {
 		"  GET  /submissions/{id}        结果；判题中逐用例行一条条冒出来（页面内局部刷新）",
 		"  GET  /submissions/{id}/live   判题中的局部刷新块（详情页脚本轮询，不再整页刷新）",
 		"  POST /submissions/{id}/rejudge 重新判题（要 submission.rejudge）：退回队列，清掉上一次的判定与逐用例",
+		"  GET  /objective               客观题列表；POST /objective/{id}/answer 交卷（服务端即时判分）",
 		"  GET  /feed                    动态（?user= &after= &limit=）；POST /feed 发一条",
 		"  GET  /topics                  社区贴列表（?q= &after= &limit=）；/topics/new 发帖",
 		"  GET  /topics/{id}             帖子正文与评论；POST /topics/{id}/delete 删帖（本人或 topic.moderate）",

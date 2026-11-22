@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/xml"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/liangbinchen2013/fast-oj/internal/store"
@@ -40,6 +41,7 @@ func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
 			{Loc: base + "/problems"},
 			{Loc: base + "/contests"},
 			{Loc: base + "/topics"},
+			{Loc: base + "/objective"},
 			{Loc: base + "/rank"},
 		},
 	}
@@ -59,6 +61,14 @@ func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		cursor.PID = page.NextPID
+	}
+	// 客观题只列公开的。
+	if sets, err := s.db.ListObjectiveSets(r.Context(), 0, false, 500); err == nil {
+		for _, o := range sets {
+			if o.Visible {
+				set.URLs = append(set.URLs, sitemapURL{Loc: base + "/objective/" + strconv.FormatInt(o.ID, 10)})
+			}
+		}
 	}
 	// 比赛列表只含公开的；隐藏比赛与加入码不该出现在站点地图里。
 	if page, err := s.db.ListContests(r.Context(), 0, 500, "", false); err == nil {
