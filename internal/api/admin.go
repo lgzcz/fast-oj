@@ -28,8 +28,8 @@ type adminUserRow struct {
 }
 
 func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
-	// 这一页对两种管理员都有意义：permission.manage 来看和改能力，user.manage 来改角色、
-	// 状态、标签和注销。所以门槛是"任意一把"，具体哪几个按钮出现由下面的能力位决定。
+	// 这一页对两种管理员都有意义：permission.manage 来看和改能力与角色，user.manage
+	// 来改状态、标签和注销。所以门槛是"任意一把"，具体哪几个按钮出现由下面的能力位决定。
 	a, ok := s.requireAnyPerm(w, r, permPermissionManage, permUserManage)
 	if !ok {
 		return
@@ -94,8 +94,9 @@ func (s *Server) handleAdminUser(w http.ResponseWriter, r *http.Request) {
 		"Cancelled": u.IsCancelled(),
 		"Anonym":    store.AnonymousName,
 		"CanUser":   a.can(permUserManage),
-		// CanPerm 决定那排"授予/收回/恢复默认"的按钮出不出现：能改角色与标签的人不必
-		// 也能改能力，两件事分开授权。
+		// CanPerm 决定两处按钮：逐项的"授予/收回/恢复默认"，以及角色下拉。角色也是
+		// 能力的一种（admin 档等于全部能力），所以两者同一把钥匙；标签、状态、注销
+		// 仍然只需要 user.manage。
 		"CanPerm": a.can(permPermissionManage),
 		// 标签给的是原文（逗号分隔），管理员看到的输入框就是他自己上次写的那样。
 		"Tags":       u.Tags,
@@ -272,8 +273,11 @@ func (s *Server) handleAdminPermChange(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, back+"?msg="+url.QueryEscape(fmt.Sprintf("%s → %s", target.Handle, key)), http.StatusSeeOther)
 }
 
+// handleAdminRoleChange 改的是"这个人属于哪一档"，而 admin 这一档的基线是全部能力位。
+// 所以它和逐项授予同一口径：要 permission.manage，不是 user.manage。否则只被委派
+// "管用户"的人可以把自己的小号提成 admin，再反过来接管整个站务层。
 func (s *Server) handleAdminRoleChange(w http.ResponseWriter, r *http.Request) {
-	a, ok := s.requirePerm(w, r, permUserManage)
+	a, ok := s.requirePerm(w, r, permPermissionManage)
 	if !ok {
 		return
 	}

@@ -331,6 +331,45 @@ func TestRoleAndStatusChanges(t *testing.T) {
 	}
 }
 
+// 角色也是权限：admin 这一档的基线是全部能力位，所以授予它得和逐项授予同一把钥匙。
+// 只持 user.manage 的人能封号、能注销，但不能把自己的小号提成管理员。
+func TestRoleChangeNeedsPermissionManage(t *testing.T) {
+	h := newHarness(t)
+	h.author("victim2")
+	moderator := h.author("moder2", permUserManage)
+	chief := h.author("chief2", permUserManage, permPermissionManage)
+
+	// user.manage 单独不足以改角色；被拒之后角色原样不动。
+	if code, body := h.postAs(moderator, "/admin/users/victim2/role",
+		url.Values{"role": {"admin"}}); code != http.StatusForbidden {
+		t.Fatalf("user.manage 改角色 = %d %s", code, short(body))
+	}
+	if u := h.user("victim2"); u.Role != "user" {
+		t.Fatalf("被拒的角色变更仍然生效了：%s", u.Role)
+	}
+
+	// 同一页上，状态那一段仍然归 user.manage；角色那一段不出现。
+	h.unlock(moderator, "/admin/perms/u/victim2")
+	if _, page := h.getAs(moderator, "/admin/perms/u/victim2"); strings.Contains(page, "改角色") ||
+		!strings.Contains(page, "改状态") {
+		t.Errorf("user.manage 的页面应只有状态表单：\n%s", short(page))
+	}
+
+	// permission.manage 持有者确认身份后可以改，并且留下审计行。
+	h.unlock(chief, "/admin/perms/u/victim2")
+	if code, body := h.postAs(chief, "/admin/users/victim2/role",
+		url.Values{"role": {"admin"}}); code != http.StatusOK {
+		t.Fatalf("permission.manage 改角色 = %d %s", code, short(body))
+	}
+	if u := h.user("victim2"); u.Role != "admin" {
+		t.Fatalf("角色 = %s", u.Role)
+	}
+	if rows := h.auditRows("role.change"); len(rows) != 1 || rows[0].Target != "victim2" ||
+		!strings.Contains(rows[0].Detail, "admin") {
+		t.Errorf("role.change 审计行 = %+v", rows)
+	}
+}
+
 func TestJudgeViewRight(t *testing.T) {
 	h := newHarness(t)
 	watcher := h.author("watcher7")

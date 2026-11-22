@@ -94,11 +94,11 @@
   想让他重新跟着积分走，选回"跟着积分自动"。参数的口径在 <a href="/admin/points">积分与颜色</a> 那一页。</p>
 {{end}}
 
-{{if and (not .Data.Self) (not .Data.Owner) (not .Data.NeedStepUp) .Data.CanUser}}
-<h2>角色与状态</h2>
+{{if and (not .Data.Self) (not .Data.Owner) (not .Data.NeedStepUp) .Data.CanPerm}}
+<h2>角色</h2>
 <form class="row" method="post" action="/admin/users/{{.Data.Target.Handle}}/role">
   <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
-  <div><label>角色</label>
+  <div><label>角色（admin 自带全部能力位）</label>
     <select name="role">
       <option value="user">user</option>
       <option value="admin">admin</option>
@@ -106,7 +106,12 @@
   </div>
   <input type="submit" value="改角色">
 </form>
+<p class="meta">改角色等于改权限：admin 这一档的基线是全部能力位。所以它和逐项授予一样要
+  <code>permission.manage</code>；只负责封禁、改名与注销的管理员改不了这里。</p>
+{{end}}
 
+{{if and (not .Data.Self) (not .Data.Owner) (not .Data.NeedStepUp) .Data.CanUser}}
+<h2>状态</h2>
 <form class="row" method="post" action="/admin/users/{{.Data.Target.Handle}}/status">
   <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
   <div><label>状态（封禁会立即踢掉所有登录会话）</label>
