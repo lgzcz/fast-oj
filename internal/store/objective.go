@@ -202,6 +202,39 @@ func (db *DB) UpdateObjectiveSet(ctx context.Context, id int64, title, body stri
 	if err := insertObjectiveQuestions(ctx, tx, id, questions, nowMS()); err != nil {
 		return err
 	}
+	// 题目整组换了，旧作答按新题重算：保留"做过"这件事，但不让旧得分对应新题。
+	rows, err := tx.QueryContext(ctx, `SELECT user_id, answers FROM objective_attempts WHERE set_id=?`, id)
+	if err != nil {
+		return err
+	}
+	type retally struct {
+		userID       int64
+		score, total int
+	}
+	var pending []retally
+	for rows.Next() {
+		var userID int64
+		var raw string
+		if err := rows.Scan(&userID, &raw); err != nil {
+			rows.Close()
+			return err
+		}
+		answers := parseObjectiveAnswers(raw)
+		score, total := ScoreObjective(questions, answers)
+		pending = append(pending, retally{userID: userID, score: score, total: total})
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+	for _, r := range pending {
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE objective_attempts SET score=?, total=? WHERE set_id=? AND user_id=?`,
+			r.score, r.total, id, r.userID); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
 }
 

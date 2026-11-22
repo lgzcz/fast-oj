@@ -77,6 +77,10 @@ func TestObjectiveCreateAnswerAndScore(t *testing.T) {
 	if code, _ := h.postAs(user, path, objectiveValues("抢改", "x|y|z|A", true)); code != http.StatusForbidden {
 		t.Fatalf("foreign update = %d", code)
 	}
+	// 旧作答（第一题选 B）在新题（答案 A）上重算为 0/1。
+	if _, body := h.getAs(user, path); !strings.Contains(body, "0 / 1") {
+		t.Fatalf("stale attempt was not retallied:\n%s", body)
+	}
 
 	// 坏行整张拒收，且不落库。
 	before := latestObjectiveID(t, h)
