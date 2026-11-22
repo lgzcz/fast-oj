@@ -46,6 +46,13 @@ func (s *Server) handleFollow(w http.ResponseWriter, r *http.Request, follow boo
 
 	note := "已关注 " + nameOf(u)
 	if follow {
+		if blocked, err := s.db.EitherBlocked(r.Context(), a.User.ID, u.ID); err != nil {
+			s.writeStoreError(w, r, err)
+			return
+		} else if blocked {
+			http.Redirect(w, r, back+"?msg="+url.QueryEscape("你们之间有拉黑关系，不能关注"), http.StatusSeeOther)
+			return
+		}
 		// The store refuses self-follows and treats a repeat as success, so neither
 		// needs its own branch here.
 		if err := s.db.Follow(r.Context(), a.User.ID, u.ID); err != nil {

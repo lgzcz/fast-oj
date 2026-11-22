@@ -133,6 +133,13 @@ func (s *Server) handleSend(w http.ResponseWriter, r *http.Request) {
 		s.replyBack(w, r, back, "不能给自己发私信")
 		return
 	}
+	if blocked, err := s.db.EitherBlocked(r.Context(), a.User.ID, peer.ID); err != nil {
+		s.writeStoreError(w, r, err)
+		return
+	} else if blocked {
+		s.replyBack(w, r, back, "你们之间有拉黑关系，私信发不出去")
+		return
+	}
 
 	// Content first: a message that could never be stored should not burn a slot
 	// in the rate limit, nor be reported as one.

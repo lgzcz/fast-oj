@@ -9,6 +9,23 @@
 
 <article class="post-body">{{.Data.Body}}</article>
 
+{{if .Me}}
+<details class="meta">
+  <summary>举报这个帖子</summary>
+  <form class="row" method="post" action="/reports">
+    <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+    <input type="hidden" name="target_kind" value="topic">
+    <input type="hidden" name="target_id" value="{{.Data.ID}}">
+    <div><label>原因</label><select name="reason">
+      <option value="spam">垃圾广告</option><option value="abuse">辱骂/骚扰</option>
+      <option value="cheat">抄袭/作弊</option><option value="other">其他</option>
+    </select></div>
+    <div style="flex:1 1 18rem"><label>补充（可空）</label><input type="text" name="detail" maxlength="1000"></div>
+    <div><label>&nbsp;</label><input type="submit" value="提交举报"></div>
+  </form>
+</details>
+{{end}}
+
 <p class="meta">
   <a href="{{.Data.BackLink}}">{{.Data.BackText}} →</a>
   {{if .Data.CanDelete}}
@@ -22,7 +39,7 @@
 
 <h2>评论{{if .Data.CommentNum}}（{{.Data.CommentNum}}）{{end}}</h2>
 {{range .Data.Comments}}
-<article class="reply">
+<article class="reply" id="c{{.ID}}">
   <header>
     <a class="who pt-{{.Color}}" href="/u/{{.Author}}">{{.DisplayName}}</a>
     <span class="when">{{.When}}</span>
@@ -31,6 +48,21 @@
       <input type="hidden" name="csrf" value="{{$.Me.CSRF}}">
       <button type="submit">删除</button>
     </form>
+    {{end}}
+    {{if $.Me}}
+    <details class="inline ops"><summary>举报</summary>
+      <form class="row" method="post" action="/reports">
+        <input type="hidden" name="csrf" value="{{$.Me.CSRF}}">
+        <input type="hidden" name="target_kind" value="comment">
+        <input type="hidden" name="target_id" value="{{.ID}}">
+        <div><label>原因</label><select name="reason">
+          <option value="spam">垃圾广告</option><option value="abuse">辱骂/骚扰</option>
+          <option value="cheat">抄袭/作弊</option><option value="other">其他</option>
+        </select></div>
+        <div style="flex:1 1 14rem"><label>补充（可空）</label><input type="text" name="detail" maxlength="1000"></div>
+        <div><label>&nbsp;</label><input type="submit" value="举报"></div>
+      </form>
+    </details>
     {{end}}
   </header>
   <div class="body">{{.Body}}</div>

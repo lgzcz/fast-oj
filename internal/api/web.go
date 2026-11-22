@@ -696,6 +696,7 @@ type tallyView struct {
 type solvedView struct{ PID, Title, Time, When string }
 
 type userData struct {
+	UserID      int64
 	Handle      string
 	DisplayName string
 	Bio         template.HTML
@@ -720,6 +721,9 @@ type userData struct {
 	// templates then render exactly what they did before this feature existed.
 	AvatarURL string
 	CoverURL  string
+	// Blocked is viewer -> this profile. CanBlock is false for self and anonymous.
+	Blocked  bool
+	CanBlock bool
 	Dims   []store.Dim
 	// NameColor 是这个名字该渲染成哪一档。
 	NameColor  string
@@ -847,6 +851,13 @@ func (s *Server) handleUser(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, r, err)
 		return
 	}
+	blocked := false
+	if a.User.ID != 0 && a.User.ID != u.ID {
+		if blocked, err = s.db.IsBlocked(ctx, a.User.ID, u.ID); err != nil {
+			s.writeStoreError(w, r, err)
+			return
+		}
+	}
 	avatarURL, coverURL := "", ""
 	if img, ok, err := s.db.LatestImage(ctx, u.ID, store.ImageAvatar); err != nil {
 		s.writeStoreError(w, r, err)
@@ -862,7 +873,7 @@ func (s *Server) handleUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.page(w, r, http.StatusOK, u.Handle, "user", me, msgOf(r), userData{
-		Handle: u.Handle, DisplayName: u.DisplayName,
+		UserID: u.ID, Handle: u.Handle, DisplayName: u.DisplayName,
 		Bio: renderMarkdownHTML(u.Bio), HasBio: strings.TrimSpace(u.Bio) != "",
 		Admin: u.Role == "admin", Owner: owner, Joined: agoMS(u.CreatedAt),
 		// Cancelled is the tombstone marker: the profile still shows what this
@@ -871,6 +882,7 @@ func (s *Server) handleUser(w http.ResponseWriter, r *http.Request) {
 		Solved:    len(solved), TotalProblems: totalProblems, Submits: submits,
 		Points: u.Points, Rating: u.Rating, Dims: u.Dims(), NameColor: u.ColorClass(),
 		AvatarURL: avatarURL, CoverURL: coverURL,
+		Blocked: blocked, CanBlock: a.User.ID != 0 && a.User.ID != u.ID,
 		Tally: tallyRows, SolvedList: solvedList, Recent: rows,
 		Posts:     postRows(myPosts, a),
 		IsSelf:    a.User.ID == u.ID,

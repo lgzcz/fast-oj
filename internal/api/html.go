@@ -97,7 +97,9 @@ type viewer struct {
 	// Plagiarism is the 查重 entry; it rides on submission.view.any, the same
 	// capability that already lets someone read everyone's source.
 	Plagiarism bool
-	CSRF       string
+	// Reports is the 举报队列 entry for community moderators.
+	Reports bool
+	CSRF    string
 	// ThemeMode 与 ThemeStyle 是这个人在 /settings 里给自己挑的观感：前者是明暗底色
 	// （空=跟着系统），后者是已经过白名单校验的自定义属性串。匿名访客两个都是空，页面
 	// 与没有这个功能时一模一样，也就多不出一分钱开销。

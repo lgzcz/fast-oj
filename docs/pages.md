@@ -117,6 +117,10 @@
 | `POST` | `/images/upload` | 登录用户 | 上传正文图（≤8MB，每人最多 200 张） |
 | `GET` | `/images/{id}` | 公开 | 读取图片；随机落盘、按库里的 MIME 返回 |
 | `POST` | `/images/{id}/delete` | 图片所有者 | 删除图片（硬删除） |
+| `POST` | `/reports` | 登录用户 | 举报帖子/评论/用户/文章（每人每小时 20 条；同目标只能有一条待处理） |
+| `GET` | `/admin/reports` | `topic.moderate` | 举报队列，`?status=open\|closed\|all` |
+| `POST` | `/admin/reports/{id}/close` | `topic.moderate` | 结案并留一句处理说明（写审计） |
+| `POST` | `/u/{handle}/block` `/unblock` | 登录用户 | 拉黑 / 解除；断开双方关注，互发私信与关注被挡 |
 | `GET` | `/verify?token=…` | 邮件里的链接 | 验证邮箱：一次有效，用过/过期都给出原因 |
 | `GET` | `/docs` `/updates` | 公开 | 使用说明与用户可见的更新日志 |
 | `GET` | `/sitemap.xml` | 公开 | 公开题目与比赛的站点地图；隐藏内容不出现 |

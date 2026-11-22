@@ -1,0 +1,41 @@
+{{define "content"}}
+<h1>举报队列</h1>
+<p class="meta">待处理 <b>{{.Data.Open}}</b> 条。
+  <a href="/admin/reports?status=open">只看待处理</a> ·
+  <a href="/admin/reports?status=closed">看已处理</a> ·
+  <a href="/admin/reports?status=all">全部</a>
+</p>
+
+<div class="table-scroll" role="region" aria-label="举报列表" tabindex="0">
+<table>
+  <tr><th>目标</th><th>原因</th><th>举报人</th><th>说明</th><th>时间</th><th>状态 / 处理</th></tr>
+  {{range .Data.Rows}}
+  <tr>
+    <td><span class="badge">{{.TargetKindLabel}}</span>
+      {{if .TargetURL}}<a href="{{.TargetURL}}">{{.TargetLabel}}</a>{{else}}{{.TargetLabel}}{{end}}</td>
+    <td>{{.ReasonLabel}}</td>
+    <td>{{if .ReporterHandle}}<a href="/u/{{.ReporterHandle}}">{{.Reporter}}</a>{{else}}{{.Reporter}}{{end}}</td>
+    <td>{{if .Detail}}{{.Detail}}{{else}}<span class="meta">—</span>{{end}}</td>
+    <td>{{.When}}</td>
+    <td>
+      {{if eq .Status "open"}}
+      <form method="post" action="/admin/reports/{{.ID}}/close" class="row">
+        <input type="hidden" name="csrf" value="{{$.Me.CSRF}}">
+        <div style="flex:1 1 12rem"><label>处理说明（可空）</label>
+          <input type="text" name="resolution" maxlength="1000"></div>
+        <div><label>&nbsp;</label><button type="submit">标记已处理</button></div>
+      </form>
+      {{else}}
+      <span class="badge ok">已处理</span>{{if .Handler}} · {{.Handler}}{{end}}
+      {{if .Resolution}}<div class="meta">{{.Resolution}}</div>{{end}}
+      {{end}}
+    </td>
+  </tr>
+  {{else}}
+  <tr><td colspan="6">这个筛选下没有举报。</td></tr>
+  {{end}}
+</table>
+</div>
+
+<p class="meta">这里只负责记录与结案；删帖、封号仍走各自已有的按钮。结案会写进审计。</p>
+{{end}}

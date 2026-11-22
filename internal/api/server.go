@@ -325,6 +325,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /admin/accounts", s.handleAccountsCreate)
 	mux.HandleFunc("GET /admin/stats", s.handleStats)
 	mux.HandleFunc("GET /admin/plagiarism", s.handlePlagiarism)
+	mux.HandleFunc("GET /admin/reports", s.handleReportsQueue)
+	mux.HandleFunc("POST /admin/reports/{id}/close", s.handleReportClose)
+	mux.HandleFunc("POST /reports", s.handleReportCreate)
+	mux.HandleFunc("POST /u/{handle}/block", s.handleBlock)
+	mux.HandleFunc("POST /u/{handle}/unblock", s.handleUnblock)
 	// IP 封禁与按地址流量：来源全是 127.0.0.1 时这一页会自动收起（见 ipFeatureOn）。
 	mux.HandleFunc("GET /admin/ips", s.handleIPs)
 	mux.HandleFunc("POST /admin/ips/ban", s.handleIPBanAdd)
