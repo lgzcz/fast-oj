@@ -46,9 +46,20 @@
   <p><input type="submit" value="保存"></p>
 </form>
 
-<h2>谁可以给我发私信</h2>
+<h2>隐私与展示</h2>
 <form method="post" action="/settings/privacy">
   <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <label class="check">
+    <input type="checkbox" name="academic_mode" value="1" {{if .Data.AcademicMode}}checked{{end }}>
+    学术模式：个人主页只留学术数据，隐藏动态、最近提交、关注/粉丝与打卡
+  </label>
+  <label class="check">
+    <input type="checkbox" name="stealth" value="1" {{if .Data.Stealth}}checked{{end }}>
+    隐身：有比赛进行时，把我的动态与提交从公开列表里收起，比赛结束后自动恢复
+  </label>
+  <p class="meta">两者都只影响公开展示：判题、榜单、Rating 与权限不受影响；管理员和题目作者仍能查到本该能查的记录。</p>
+
+  <h3>谁可以给我发私信</h3>
   <label class="check">
     <input type="radio" name="dm_policy" value="everyone" {{if eq .Data.DMPolicy "everyone" }}checked{{end }}>
     所有人（默认）

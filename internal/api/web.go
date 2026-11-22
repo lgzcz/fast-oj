@@ -395,7 +395,7 @@ func (s *Server) problemPage(w http.ResponseWriter, r *http.Request, a actor, p 
 
 	// The recent list is scoped below when the page is a contest page.
 	filter := store.DetailFilter{
-		ProblemID: p.ID, Limit: 10,
+		ProblemID: p.ID, Limit: 10, HideStealth: true,
 		PublicView: true, ViewerID: a.User.ID,
 		SeeAll: a.can(permSubmissionViewAny) || a.can(permProblemEditAny),
 	}
@@ -724,7 +724,7 @@ type userData struct {
 	// Blocked is viewer -> this profile. CanBlock is false for self and anonymous.
 	Blocked  bool
 	CanBlock bool
-	Dims   []store.Dim
+	Dims     []store.Dim
 	// NameColor 是这个名字该渲染成哪一档。
 	NameColor  string
 	Tally      []tallyView
@@ -741,6 +741,10 @@ type userData struct {
 	Followers int
 	IFollow   bool
 	Mutual    bool
+	// HideActivity is the academic-mode / stealth answer for 动态与最近提交;
+	// HideSocial also drops follows and check-in (academic mode only).
+	HideActivity bool
+	HideSocial   bool
 }
 
 func (s *Server) handleUser(w http.ResponseWriter, r *http.Request) {
@@ -753,6 +757,16 @@ func (s *Server) handleUser(w http.ResponseWriter, r *http.Request) {
 	}
 	a, _ := s.authenticate(r)
 	seeAll := a.can(permSubmissionViewAny) || a.can(permProblemEditAny)
+	// 学术模式与隐身都只是公开展示的口径；本人、题主与审核者看到的还是原样。
+	privileged := a.User.ID == u.ID || seeAll || a.can(permFeedModerate)
+	academic := !privileged && u.AcademicMode
+	hideActivity := academic
+	if !privileged && u.Stealth && !hideActivity {
+		if hideActivity, err = s.db.ContestRunning(ctx, time.Now().UnixMilli()); err != nil {
+			s.writeStoreError(w, r, err)
+			return
+		}
+	}
 	solved, err := s.db.SolvedProblems(ctx, u.ID, a.User.ID, seeAll)
 	if err != nil {
 		s.writeStoreError(w, r, err)
@@ -763,13 +777,16 @@ func (s *Server) handleUser(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, r, err)
 		return
 	}
-	recent, err := s.db.ListSubmissionDetails(ctx, store.DetailFilter{
-		UserID: u.ID, Limit: 20,
-		PublicView: true, ViewerID: a.User.ID, SeeAll: seeAll,
-	})
-	if err != nil {
-		s.writeStoreError(w, r, err)
-		return
+	var recent []store.SubmissionDetail
+	if !hideActivity {
+		recent, err = s.db.ListSubmissionDetails(ctx, store.DetailFilter{
+			UserID: u.ID, Limit: 20, HideStealth: true,
+			PublicView: true, ViewerID: a.User.ID, SeeAll: seeAll,
+		})
+		if err != nil {
+			s.writeStoreError(w, r, err)
+			return
+		}
 	}
 
 	submits := 0
@@ -814,21 +831,28 @@ func (s *Server) handleUser(w http.ResponseWriter, r *http.Request) {
 	// Own profile shows hidden entries too, so the author can see what was taken
 	// down; moderators see them everywhere.
 	canSeeHidden := a.User.ID == u.ID || a.can(permFeedModerate)
-	myPosts, err := s.db.ListPosts(ctx, 20, 0, u.ID, canSeeHidden)
-	if err != nil {
-		s.writeStoreError(w, r, err)
-		return
+	var myPosts []store.Post
+	if !hideActivity {
+		myPosts, err = s.db.ListPosts(ctx, 20, 0, u.ID, canSeeHidden, a.User.ID, true)
+		if err != nil {
+			s.writeStoreError(w, r, err)
+			return
+		}
 	}
 
-	checkIn, err := s.db.CheckInState(ctx, u.ID, time.Now())
-	if err != nil {
-		s.writeStoreError(w, r, err)
-		return
+	var checkIn store.CheckInState
+	if !academic {
+		if checkIn, err = s.db.CheckInState(ctx, u.ID, time.Now()); err != nil {
+			s.writeStoreError(w, r, err)
+			return
+		}
 	}
-	following, followers, err := s.db.FollowCounts(ctx, u.ID)
-	if err != nil {
-		s.writeStoreError(w, r, err)
-		return
+	following, followers := 0, 0
+	if !academic {
+		if following, followers, err = s.db.FollowCounts(ctx, u.ID); err != nil {
+			s.writeStoreError(w, r, err)
+			return
+		}
 	}
 	iFollow, mutual := false, false
 	if a.User.ID != 0 && a.User.ID != u.ID {
@@ -889,6 +913,7 @@ func (s *Server) handleUser(w http.ResponseWriter, r *http.Request) {
 		Following: following, Followers: followers,
 		IFollow: iFollow, Mutual: mutual,
 		CheckInStreak: checkIn.Streak, CheckInTotal: checkIn.Total,
+		HideActivity: hideActivity, HideSocial: academic,
 	})
 }
 

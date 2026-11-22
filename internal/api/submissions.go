@@ -216,6 +216,7 @@ func (s *Server) handleSubmitList(w http.ResponseWriter, r *http.Request) {
 	f.Limit = pageLimit(q.Get("limit"))
 	f.AfterID, _ = strconv.ParseInt(q.Get("after"), 10, 64)
 	f.PublicView = true
+	f.HideStealth = true
 	f.ViewerID = a.User.ID
 	f.SeeAll = a.can(permSubmissionViewAny) || a.can(permProblemEditAny)
 

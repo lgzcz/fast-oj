@@ -37,6 +37,13 @@ type User struct {
 	// Rating is the Elo-style contest rating; accounts start at 1200 and only
 	// contests marked 计入 rating move it.
 	Rating int `json:"rating"`
+	// AcademicMode hides the social half of the public profile: feed posts,
+	// recent submissions, follows and check-in. Contest results and ratings stay.
+	AcademicMode bool `json:"academic_mode"`
+	// Stealth hides this person's feed posts and practice submissions from public
+	// lists while any contest is running. The owner, problem owners and holders of
+	// submission.view.any still see them; everything returns when the contest ends.
+	Stealth bool `json:"stealth"`
 }
 
 // ColorClass 是渲染名字时用的那一档：库里存的空串表示"最低一档"，页面需要一个类名，

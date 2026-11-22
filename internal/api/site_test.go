@@ -372,7 +372,7 @@ func TestFeedModerationAndOwnership(t *testing.T) {
 	if code, body := h.postForm2("/feed", url.Values{"body": {"第二条"}}, authorCookie, authorCSRF); code != http.StatusOK {
 		t.Fatalf("second post = %d %s", code, body)
 	}
-	mine, err := h.db.ListPosts(ctx(), 1, 0, h.user("author8").ID, true)
+	mine, err := h.db.ListPosts(ctx(), 1, 0, h.user("author8").ID, true, 0, false)
 	if err != nil || len(mine) != 1 {
 		t.Fatalf("author timeline = %+v %v", mine, err)
 	}

@@ -75,7 +75,7 @@ func (db *DB) GetPost(ctx context.Context, id int64) (Post, error) {
 
 // ListPosts walks newest-first with a cursor. includeHidden is only meaningful
 // for a moderator viewing their own audit surface.
-func (db *DB) ListPosts(ctx context.Context, limit int, after int64, authorID int64, includeHidden bool) ([]Post, error) {
+func (db *DB) ListPosts(ctx context.Context, limit int, after int64, authorID int64, includeHidden bool, viewerID int64, hideStealth bool) ([]Post, error) {
 	if limit <= 0 {
 		limit = DefaultPostPage
 	} else if limit > MaxPostPage {
@@ -93,6 +93,11 @@ func (db *DB) ListPosts(ctx context.Context, limit int, after int64, authorID in
 	if after != 0 {
 		q += ` AND p.id<?`
 		args = append(args, after)
+	}
+	if hideStealth {
+		q += ` AND NOT (IFNULL(u.stealth,0)=1 AND p.author_id<>? AND EXISTS (
+			SELECT 1 FROM contests sc WHERE sc.start_at<=? AND sc.end_at>?))`
+		args = append(args, viewerID, nowMS(), nowMS())
 	}
 	q += ` ORDER BY p.id DESC LIMIT ?`
 	args = append(args, limit)

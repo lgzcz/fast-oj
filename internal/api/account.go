@@ -463,12 +463,16 @@ type settingsData struct {
 	Joined      string
 	// DMPolicy is who may send this person a private message.
 	DMPolicy string
+	// AcademicMode and Stealth are the two public-profile switches saved by the
+	// same privacy form as DMPolicy.
+	AcademicMode bool
+	Stealth      bool
 	// EmailVerified is the account page's answer to "why can't I submit": the flag
 	// itself, not the site switch, because a row this feature never touched reads as
 	// verified and that person must not be offered a link to click.
 	EmailVerified bool
 	// Theme 是这一页的配色卡：九格颜色 + 明暗底色，只影响看的人自己。
-	Theme themeView
+	Theme     themeView
 	AvatarURL string
 	CoverURL  string
 }
@@ -478,6 +482,7 @@ func (s *Server) buildSettings(ctx context.Context, a actor) settingsData {
 		Email: a.User.Email, DisplayName: a.User.DisplayName, Bio: a.User.Bio,
 		HasPassword: a.User.HasPassword, Joined: agoMS(a.User.CreatedAt),
 		DMPolicy: a.User.DMPolicy, EmailVerified: a.User.EmailVerified,
+		AcademicMode: a.User.AcademicMode, Stealth: a.User.Stealth,
 		Theme: buildThemeView(a.User.Theme),
 	}
 	if img, ok, err := s.db.LatestImage(ctx, a.User.ID, store.ImageAvatar); err == nil && ok {

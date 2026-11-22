@@ -14,7 +14,7 @@ func TestModeratorCanDeleteAnyPost(t *testing.T) {
 	moderator := h.author("post_mod", permFeedModerate)
 
 	h.postAs(author, "/feed", url.Values{"body": {"管理员可以删这条"}})
-	posts, err := h.db.ListPosts(ctx(), 10, 0, 0, false)
+	posts, err := h.db.ListPosts(ctx(), 10, 0, 0, false, 0, false)
 	if err != nil || len(posts) == 0 {
 		t.Fatalf("post not created: %v", err)
 	}
@@ -24,7 +24,7 @@ func TestModeratorCanDeleteAnyPost(t *testing.T) {
 		t.Fatalf("管理员看不到删除/隐藏按钮：\n%s", short(page))
 	}
 	h.postAs(moderator, fmt.Sprintf("/feed/%d/delete", id), url.Values{})
-	if posts, err = h.db.ListPosts(ctx(), 10, 0, 0, false); err != nil {
+	if posts, err = h.db.ListPosts(ctx(), 10, 0, 0, false, 0, false); err != nil {
 		t.Fatal(err)
 	}
 	if len(posts) != 0 {
@@ -36,7 +36,7 @@ func TestAuthorCanDeleteOwnPost(t *testing.T) {
 	h := newHarness(t)
 	author := h.author("own_post_author")
 	h.postAs(author, "/feed", url.Values{"body": {"自己的动态"}})
-	posts, err := h.db.ListPosts(ctx(), 10, 0, 0, false)
+	posts, err := h.db.ListPosts(ctx(), 10, 0, 0, false, 0, false)
 	if err != nil || len(posts) == 0 {
 		t.Fatalf("post not created: %v", err)
 	}

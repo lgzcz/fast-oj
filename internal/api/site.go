@@ -144,7 +144,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, r, err)
 		return
 	}
-	posts, err := s.db.ListPosts(r.Context(), 8, 0, 0, false)
+	posts, err := s.db.ListPosts(r.Context(), 8, 0, 0, false, a.User.ID, true)
 	if err != nil {
 		s.writeStoreError(w, r, err)
 		return

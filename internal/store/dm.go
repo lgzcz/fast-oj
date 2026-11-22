@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"strings"
 )
@@ -80,6 +81,28 @@ func (db *DB) SetDMPolicy(ctx context.Context, userID int64, policy string) erro
 	}
 	_, err := db.SQL.ExecContext(ctx, `UPDATE users SET dm_policy=? WHERE id=?`, policy, userID)
 	return err
+}
+
+// SetPrivacy stores the two display switches. They are presentation only: no judge,
+// rating or permission query reads them.
+func (db *DB) SetPrivacy(ctx context.Context, userID int64, academic, stealth bool) error {
+	_, err := db.SQL.ExecContext(ctx,
+		`UPDATE users SET academic_mode=?, stealth=? WHERE id=?`,
+		boolInt(academic), boolInt(stealth), userID)
+	return err
+}
+
+// ContestRunning reports whether any contest window contains now. Stealth reads it
+// instead of a cached flag so the moment the last contest ends the hidden lists
+// come back without a restart.
+func (db *DB) ContestRunning(ctx context.Context, now int64) (bool, error) {
+	var one int
+	err := db.SQL.QueryRowContext(ctx,
+		`SELECT 1 FROM contests WHERE start_at<=? AND end_at>? LIMIT 1`, now, now).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return err == nil, err
 }
 
 // MayMessage decides whether `sender` may write to `recipient`, given the

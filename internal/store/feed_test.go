@@ -47,11 +47,11 @@ func TestFeedRoundTrip(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	page, err := db.ListPosts(ctx, 2, 0, 0, false)
+	page, err := db.ListPosts(ctx, 2, 0, 0, false, 0, false)
 	if err != nil || len(page) != 2 || !strings.HasPrefix(page[0].Body, "p2") {
 		t.Fatalf("first page = %+v %v", page, err)
 	}
-	older, err := db.ListPosts(ctx, 2, page[1].ID, 0, false)
+	older, err := db.ListPosts(ctx, 2, page[1].ID, 0, false, 0, false)
 	if err != nil || len(older) != 2 || !strings.HasPrefix(older[0].Body, "p0") {
 		t.Fatalf("second page = %+v %v", older, err)
 	}
@@ -64,7 +64,7 @@ func TestFeedRoundTrip(t *testing.T) {
 	if _, err := db.CreatePost(ctx, other.ID, "别人的"); err != nil {
 		t.Fatal(err)
 	}
-	mine, err := db.ListPosts(ctx, 10, 0, u.ID, false)
+	mine, err := db.ListPosts(ctx, 10, 0, u.ID, false, 0, false)
 	if err != nil || len(mine) != 4 {
 		t.Fatalf("author filter = %d %v", len(mine), err)
 	}
@@ -74,11 +74,11 @@ func TestFeedRoundTrip(t *testing.T) {
 	if ok, _ := db.SetPostHidden(ctx, mine[0].ID, other.ID, true); ok {
 		t.Error("second hide should affect no rows")
 	}
-	visible, _ := db.ListPosts(ctx, 10, 0, u.ID, false)
+	visible, _ := db.ListPosts(ctx, 10, 0, u.ID, false, 0, false)
 	if len(visible) != 3 {
 		t.Fatalf("hidden post still listed: %d", len(visible))
 	}
-	withHidden, _ := db.ListPosts(ctx, 10, 0, u.ID, true)
+	withHidden, _ := db.ListPosts(ctx, 10, 0, u.ID, true, 0, false)
 	if len(withHidden) != 4 {
 		t.Fatalf("moderator view = %d, want 4", len(withHidden))
 	}

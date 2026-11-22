@@ -122,6 +122,7 @@
 | `GET` `/POST` | `/login/2fa` | 密码已通过的挑战票 | 输入六位码或恢复码建立会话（同一张票错 5 次作废） |
 | `POST` | `/settings/sessions/{id}/revoke` `/settings/sessions/revoke-others` | 登录用户 | 退出某一台设备 / 退出其他所有设备 |
 | `POST` | `/settings/avatar` `/settings/cover` | 登录用户 | 上传头像（≤2MB）/ 封面（≤8MB），单槽位替换 |
+| `POST` | `/settings/privacy` | 登录用户 | 私信策略 + 学术模式 + 隐身开关 |
 | `GET` | `/images` | 登录用户 | 我的图床：上传正文图、复制链接、删除 |
 | `POST` | `/images/upload` | 登录用户 | 上传正文图（≤8MB，每人最多 200 张） |
 | `GET` | `/images/{id}` | 公开 | 读取图片；随机落盘、按库里的 MIME 返回 |

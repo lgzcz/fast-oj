@@ -72,7 +72,7 @@ func (s *Server) handleFeed(w http.ResponseWriter, r *http.Request) {
 	}
 	// A moderator's timeline includes hidden entries, otherwise a hide could
 	// never be undone from the UI.
-	posts, err := s.db.ListPosts(r.Context(), limit, after, authorID, a.can(permFeedModerate))
+	posts, err := s.db.ListPosts(r.Context(), limit, after, authorID, a.can(permFeedModerate), a.User.ID, true)
 	if err != nil {
 		s.writeStoreError(w, r, err)
 		return

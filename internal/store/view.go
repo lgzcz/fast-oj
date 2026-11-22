@@ -88,6 +88,9 @@ type DetailFilter struct {
 	// 一类的全见权限；置真时不再过滤。
 	ViewerID int64
 	SeeAll   bool
+	// HideStealth 打开"比赛进行中，开启了隐身的用户不出现"这一条。作者本人仍然
+	// 看得到自己的提交；全见权限不受影响。比赛结束后这条自动失效。
+	HideStealth bool
 }
 
 func (db *DB) ListSubmissionDetails(ctx context.Context, f DetailFilter) ([]SubmissionDetail, error) {
@@ -114,6 +117,11 @@ func (db *DB) ListSubmissionDetails(ctx context.Context, f DetailFilter) ([]Subm
 	if f.AfterID != 0 {
 		q += ` AND s.id<?`
 		args = append(args, f.AfterID)
+	}
+	if f.HideStealth && !f.SeeAll {
+		q += ` AND NOT (IFNULL(u.stealth,0)=1 AND s.user_id<>? AND EXISTS (
+			SELECT 1 FROM contests sc WHERE sc.start_at<=? AND sc.end_at>?))`
+		args = append(args, f.ViewerID, nowMS(), nowMS())
 	}
 	if f.PublicView && !f.SeeAll {
 		// 隐藏题：只给作者、题目主人和提交者自己看；匿名读者只看公开题。
