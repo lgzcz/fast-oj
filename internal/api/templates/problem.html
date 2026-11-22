@@ -48,6 +48,37 @@
 {{end}}
 {{end}}
 
+{{if or .Data.Attachments .Data.CanEdit}}
+<h2>附件</h2>
+{{if .Data.Attachments}}
+<ul>
+  {{range .Data.Attachments}}
+  <li>
+    <a href="/attachments/{{.ID}}{{if $.Data.Contest.ID}}?contest={{$.Data.Contest.ID}}{{end}}">{{.Name}}</a>
+    <span class="meta">{{.Size}} · {{.When}}</span>
+    {{if $.Data.CanEdit}}
+    <form class="inline" method="post" action="/problems/{{$.Data.PID}}/attachments/{{.ID}}/delete"
+          onsubmit="return confirm('删掉附件「{{.Name}}」？')">
+      <input type="hidden" name="csrf" value="{{$.Me.CSRF}}">
+      <button type="submit">删除</button>
+    </form>
+    {{end}}
+  </li>
+  {{end}}
+</ul>
+{{else}}<p class="meta">还没有附件。</p>{{end}}
+{{if .Data.CanEdit}}
+<form class="row" method="post" action="/problems/{{.Data.PID}}/attachments" enctype="multipart/form-data">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <div style="flex:1 1 20rem">
+    <label>上传附件（PDF / ZIP / 纯文本 / PNG / JPEG / GIF / WebP，单个最大 16MB）</label>
+    <input type="file" name="file" required>
+  </div>
+  <p><input type="submit" value="上传"></p>
+</form>
+{{end}}
+{{end}}
+
 <h2>提交代码</h2>
 {{if .Data.Contest.WhyNot}}
 <p class="flash">{{.Data.Contest.WhyNot}}</p>

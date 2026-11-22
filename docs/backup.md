@@ -5,7 +5,8 @@ data/
 ├── fast-oj.db        SQLite（WAL 模式，迁移内嵌在二进制里，启动即自动建库）
 ├── fast-oj.db-wal
 ├── fast-oj.db-shm
-└── cases/<题目id>/<序号>.in|.out    用例正文，库里只存相对路径
+├── cases/<题目id>/<序号>.in|.out    用例正文，库里只存相对路径
+└── attachments/<problem|ticket>/<id>/<随机名>  题目与工单附件，库里只存元数据与相对路径
 ```
 
 停掉服务后整目录拷贝就是备份；不想停服务，用 SQLite 自带的在线备份：

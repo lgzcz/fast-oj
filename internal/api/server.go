@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/liangbinchen2013/fast-oj/internal/attachfs"
 	"github.com/liangbinchen2013/fast-oj/internal/casefs"
 	"github.com/liangbinchen2013/fast-oj/internal/config"
 	"github.com/liangbinchen2013/fast-oj/internal/store"
@@ -40,6 +41,7 @@ type Server struct {
 	log     *slog.Logger
 	db      *store.DB
 	cases   *casefs.Store
+	attach  *attachfs.Store
 	cache   *siteCache
 	hits    hitCounters
 	bans    banCache
@@ -59,7 +61,8 @@ type Server struct {
 func New(cfg config.Config, log *slog.Logger, db *store.DB) *Server {
 	return &Server{
 		cfg: cfg, log: log, db: db, cases: casefs.New(cfg.DataDir),
-		cache: &siteCache{}, started: time.Now(),
+		attach: attachfs.New(cfg.DataDir),
+		cache:  &siteCache{}, started: time.Now(),
 	}
 }
 
@@ -85,6 +88,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /problems/{key}/cases/batch", s.handleCasesBatch)
 	mux.HandleFunc("POST /problems/{key}/cases/wipe", s.handleCaseWipe)
 	mux.HandleFunc("POST /problems/{key}/judge_program", s.handleJudgeProgram)
+	// 题目与工单附件：上传走各自页面，下载只有 /attachments/{id} 一个入口。
+	mux.HandleFunc("POST /problems/{key}/attachments", s.handleProblemAttachmentUpload)
+	mux.HandleFunc("POST /problems/{key}/attachments/{id}/delete", s.handleProblemAttachmentDelete)
+	mux.HandleFunc("POST /tickets/{id}/attachments", s.handleTicketAttachmentUpload)
+	mux.HandleFunc("POST /tickets/{id}/attachments/{attachment}/delete", s.handleTicketAttachmentDelete)
+	mux.HandleFunc("GET /attachments/{id}", s.handleAttachmentGet)
 	mux.HandleFunc("GET /problems/{key}/cases/{id}/edit", s.handleCaseEditPage)
 	mux.HandleFunc("POST /problems/{key}/cases/{id}/edit", s.handleCaseSave)
 	mux.HandleFunc("POST /problems/{key}/cases/{id}/delete", s.handleCaseDelete)
@@ -310,6 +319,7 @@ func (s *Server) handleAbout(w http.ResponseWriter, r *http.Request) {
 		"  POST /tickets/{id}/reply      追问或回复（登录用户，一小时 30 条）",
 		"  POST /tickets/{id}/status     改状态（处理人任意；作者只能关自己的单）",
 		"  POST /tickets/{id}/delete     删工单（ticket.handle）",
+		"  GET  /attachments/{id}        题目/工单附件下载：按所属对象重新鉴权，图片 inline、其余 attachment",
 		"  POST /feed/{id}/delete        删动态（本人，或持 feed.moderate 删别人的）",
 		"  POST /feed/{id}/hide          隐藏/恢复动态（feed.moderate）",
 		"  GET  /rank                    排行榜",

@@ -12,6 +12,35 @@
 
 <article class="post-body">{{.Data.Body}}</article>
 
+<h2>附件</h2>
+{{if .Data.Attachments}}
+<ul>
+  {{range .Data.Attachments}}
+  <li>
+    <a href="/attachments/{{.ID}}">{{.Name}}</a>
+    <span class="meta">{{.Size}} · {{.When}}</span>
+    {{if or $.Data.IsAuthor $.Data.IsHandler}}
+    <form class="inline" method="post" action="/tickets/{{$.Data.ID}}/attachments/{{.ID}}/delete"
+          onsubmit="return confirm('删掉附件「{{.Name}}」？')">
+      <input type="hidden" name="csrf" value="{{$.Me.CSRF}}">
+      <button type="submit">删除</button>
+    </form>
+    {{end}}
+  </li>
+  {{end}}
+</ul>
+{{else}}<p class="meta">还没有附件。</p>{{end}}
+{{if or .Data.IsAuthor .Data.IsHandler}}
+<form class="row" method="post" action="/tickets/{{.Data.ID}}/attachments" enctype="multipart/form-data">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <div style="flex:1 1 20rem">
+    <label>加一个附件（截图、日志、PDF 都可以；单个最大 16MB）</label>
+    <input type="file" name="file" required>
+  </div>
+  <p><input type="submit" value="上传"></p>
+</form>
+{{end}}
+
 <h2>经过</h2>
 {{if .Data.Replies}}
   {{range .Data.Replies}}

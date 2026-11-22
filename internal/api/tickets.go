@@ -324,6 +324,8 @@ type ticketData struct {
 	HasSubmit   bool
 	Submission  int64
 	Replies     []ticketReplyRow
+	// Attachments are visible to the same two people who can read the ticket.
+	Attachments []attachmentRow
 	// 谁能做什么，一次算清楚交给模板：作者能关自己的单、能追问；处理人能改状态、能删单。
 	IsAuthor   bool
 	IsHandler  bool
@@ -377,6 +379,11 @@ func (s *Server) handleTicketGet(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, r, err)
 		return
 	}
+	attItems, err := s.db.ListAttachments(r.Context(), store.AttachTicket, tk.ID)
+	if err != nil {
+		s.writeStoreError(w, r, err)
+		return
+	}
 	d := ticketData{
 		ID: tk.ID, Kind: tk.Kind, KindLabel: store.TicketKindLabel(tk.Kind),
 		Title: tk.Title, Author: tk.Author, DisplayName: ticketName(tk.DisplayName, tk.Author),
@@ -387,8 +394,9 @@ func (s *Server) handleTicketGet(w http.ResponseWriter, r *http.Request) {
 		HasProblem: tk.ProblemID != 0, ProblemPID: tk.ProblemPID, ProblemName: tk.ProblemTitle,
 		HasSubmit: tk.SubmissionID != 0, Submission: tk.SubmissionID,
 		IsAuthor: tk.AuthorID == a.User.ID, IsHandler: handler,
-		CanDelete: handler,
-		SignedIn:  true, Back: "/tickets",
+		CanDelete:   handler,
+		Attachments: attachmentRows(attItems),
+		SignedIn:    true, Back: "/tickets",
 	}
 	// 作者能关自己的单（提错了、自己解决了），也能追问； reopen 留给处理人。
 	if d.IsAuthor && tk.Status != store.TicketClosed && tk.Status != store.TicketDone {
@@ -515,6 +523,7 @@ func (s *Server) handleTicketDelete(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, r, err)
 		return
 	}
+	s.dropAttachments(r.Context(), store.AttachTicket, tk.ID)
 	// 删掉之后工单与它的线程都不在了，这一行是"这张单存在过、标题是什么、谁删的"唯一
 	// 还剩下来的东西，所以标题要写进来。
 	s.audit(r, a, "ticket.delete", strconv.FormatInt(tk.ID, 10), "已删除工单：「"+tk.Title+"」")

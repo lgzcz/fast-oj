@@ -21,6 +21,8 @@
 | `POST` | `/problems/{key}/cases/wipe` | 同上 | 清空用例 |
 | `GET` | `/problems/{key}/cases/{name}/{in\|out}` | 样例公开，判题需 admin/判机 | 取单个用例正文 |
 | `POST` | `/problems/{key}/judge_program` | `judge_program.edit` | 存/撤本题的判题器或交互器（`kind=checker\|interactor`，源码留空即撤掉） |
+| `POST` | `/problems/{key}/attachments` | 该题 owner 或 `problem.edit.any` | 传附件（PDF / 图片 / zip / 文本，单文件 ≤ 16MB，每题 20 个） |
+| `POST` | `/problems/{key}/attachments/{id}/delete` | 同上 | 删一个附件（连带落盘文件） |
 | `POST` | `/problems/{key}/submit` | 登录用户 | 网页表单提交 |
 | `GET` | `/submissions` | 公开 | 列表，`?user=`（或 `me`）`&problem=&status=&limit=&after=`；`status` 是管理员找"卡住的提交"的入口（`queued\|compiling\|running\|done\|abandoned`） |
 | `GET` | `/submissions/{id}` | 公开 | 结果。判机每完成一个用例就回报一行，未判完时页面每 2 秒自动刷新，逐用例行一条条冒出来 |
@@ -49,6 +51,9 @@
 | `POST` | `/tickets/{id}/reply` | 作者或处理人 | 追问 / 回复（每人每小时 30 条） |
 | `POST` | `/tickets/{id}/status` | 处理人任意；作者只能关自己那张 | 改状态并留一条流水 |
 | `POST` | `/tickets/{id}/delete` | `ticket.handle` | 删工单（回复一起没） |
+| `POST` | `/tickets/{id}/attachments` | 作者或处理人 | 传附件（同一套类型与大小限制，每单 20 个） |
+| `POST` | `/tickets/{id}/attachments/{attachment}/delete` | 同上 | 删一个附件 |
+| `GET` | `/attachments/{id}` | 按归属判定 | 下载附件：题目附件跟随题目可见性（比赛内题目还要在赛内）；工单附件只有作者与处理人能看到；图片内联，其余按附件下载 |
 | `GET` | `/problems/{key}/topics` | 公开 | 这道题的求助贴；从这里进发帖表单会锁主题目 |
 | `GET` | `/feed` | 公开 | 动态时间线，`?user=` `?after=` `?limit=` |
 | `POST` | `/feed` | 登录用户 | 发一条动态（每人每小时 20 条） |
