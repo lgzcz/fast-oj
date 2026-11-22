@@ -1,0 +1,24 @@
+{{define "content"}}
+<h1>{{.Data.Title}}</h1>
+<p class="meta">
+  <span class="badge">{{.Data.KindLabel}}</span>
+  {{if .Data.HasProblem}} · 题目 <a href="/problems/{{.Data.ProblemPID}}">{{.Data.ProblemPID}}</a> {{.Data.ProblemTitle}}{{end}}
+  {{if .Data.AuthorHandle}} · <a class="pt-{{.Data.Color}}" href="/u/{{.Data.AuthorHandle}}">{{.Data.Author}}</a>{{else}} · {{.Data.Author}}{{end}}
+  · {{.Data.When}} · 更新于 {{.Data.Updated}}
+  {{if not .Data.Visible}} · <span class="hidden">草稿</span>{{end}}
+  {{if .Data.CanEdit}} · <a href="{{.Data.Base}}/{{.Data.ID}}/edit">编辑</a>{{end}}
+</p>
+
+<article class="post-body">{{.Data.Body}}</article>
+
+<p class="meta">
+  <a href="{{.Data.Back}}">{{if eq .Data.Kind "solution"}}这道题的其他题解{{else}}专栏{{end}} →</a>
+  {{if .Data.CanDelete}}
+  <form class="inline" method="post" action="{{.Data.Base}}/{{.Data.ID}}/delete"
+        onsubmit="return confirm('删掉这篇{{.Data.KindLabel}}？正文不会留底。')">
+    <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+    <button type="submit" class="danger">删除</button>
+  </form>
+  {{end}}
+</p>
+{{end}}

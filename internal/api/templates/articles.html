@@ -1,0 +1,40 @@
+{{define "content"}}
+<h1>{{.Data.Title}}</h1>
+<p class="meta">
+  {{if .Data.SignedIn}}<a href="{{.Data.NewLink}}">写一篇{{.Data.Kind}}</a>{{else}}<a href="{{.Data.NewLink}}">登录后可以写{{.Data.Kind}}</a>{{end}}
+  {{if eq .Data.Kind "solution"}} · 题解按题目归档，从题目页进入{{end}}
+</p>
+
+{{if eq .Data.Kind "column"}}
+<form class="row" method="get" action="{{.Data.Base}}">
+  <div style="flex:1 1 18rem">
+    <label for="article-search">搜索专栏</label>
+    <input id="article-search" type="search" name="q" value="{{.Data.Query}}" placeholder="标题或正文里的词">
+  </div>
+  <input type="submit" value="搜索">
+</form>
+{{end}}
+
+<div class="table-scroll" role="region" aria-label="文章列表" tabindex="0">
+<table>
+  <tr><th>标题</th><th>作者</th>{{if ne .Data.Kind "solution"}}<th>题目</th>{{end}}<th>时间</th></tr>
+  {{range .Data.Rows}}
+  <tr>
+    <td><a href="{{$.Data.Base}}/{{.ID}}">{{.Title}}</a>
+      {{if not .Visible}}<span class="hidden">草稿</span>{{end}}
+      {{if .CanEdit}} <a class="meta" href="{{$.Data.Base}}/{{.ID}}/edit">编辑</a>{{end}}
+    </td>
+    <td>{{if .AuthorHandle}}<a class="pt-{{.Color}}" href="/u/{{.AuthorHandle}}">{{.Author}}</a>{{else}}{{.Author}}{{end}}</td>
+    {{if ne $.Data.Kind "solution"}}
+    <td>{{if .HasProblem}}<a href="/problems/{{.ProblemPID}}">{{.ProblemPID}}</a> {{.ProblemTitle}}{{end}}</td>
+    {{end}}
+    <td>{{.When}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="{{if eq .Data.Kind "solution"}}3{{else}}4{{end}}">{{.Data.EmptyText}}</td></tr>
+  {{end}}
+</table>
+</div>
+
+{{if .Data.Next}}<p class="meta"><a href="{{.Data.Base}}?after={{.Data.Next}}&limit={{.Data.Limit}}{{with .Data.Query}}&q={{.}}{{end}}">下一页 →</a></p>{{end}}
+{{end}}

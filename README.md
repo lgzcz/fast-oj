@@ -108,6 +108,7 @@ curl -s localhost:8080/healthz          # ok
 | [题目与工单附件](docs/attachments.md) | 题目与工单附件：上传权限、类型白名单、随机落盘与鉴权下载 |
 | [题单（训练）](docs/trainings.md) | 题单：可见性、加题规则与进度口径 |
 | [收藏与错题本](docs/favorites.md) | 收藏与错题本：私人列表、现算不落库 |
+| [题解与专栏](docs/articles.md) | 题解与专栏：挂题规则、草稿与审核删除 |
 | [判题方式：普通比较 / SPJ 判题器 / 交互题](docs/judging.md) | 判题方式：普通比较 / SPJ 判题器 / 交互题 |
 | [Python 提交：护栏装在解释器里，边界还是牢房](docs/python.md) | Python 提交：解释器护栏与牢房边界 |
 | [比赛（限时 + 独立榜 + 加入码 + 队伍，OI/IOI/ACM 三种赛制）](docs/contests.md) | 比赛：限时、独立榜、加入码、队伍、OI/IOI/ACM 三赛制 |

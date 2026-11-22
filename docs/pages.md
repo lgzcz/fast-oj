@@ -64,6 +64,14 @@
 | `POST` | `/problems/{key}/favorite` | 登录用户 | 收藏 / 取消收藏（同一个开关，再点一次就是取消） |
 | `GET` | `/favorites` | 登录用户 | 我的收藏；题目被隐藏后仍列出，但打开题面照常按可见性判定 |
 | `GET` | `/review` | 登录用户 | 错题本：提交过但还没 AC 的题，按最后一次提交倒序 |
+| `GET` | `/problems/{key}/solutions` | 题目可见性 | 这道题的题解列表；题目未公开时陌生人 404 |
+| `GET` `/POST` | `/solutions/new` `/solutions` | 登录用户 + `topic.post` | 写题解（必须填题目；每小时最多 10 篇） |
+| `GET` | `/solutions/{id}` | 公开（草稿限作者与 `topic.moderate`） | 题解正文 |
+| `GET` `/POST` | `/solutions/{id}/edit` `/solutions/{id}` | 作者 | 改题解；`POST /solutions/{id}/delete` 由作者或 `topic.moderate` 删 |
+| `GET` `/POST` | `/columns/new` `/columns` | 登录用户 + `topic.post` | 写专栏（不挂题） |
+| `GET` | `/columns` | 公开（草稿限作者与 `topic.moderate`） | 专栏列表，`?q=` `?after=` `?limit=` |
+| `GET` | `/columns/{id}` | 同上 | 专栏正文 |
+| `GET` `/POST` | `/columns/{id}/edit` `/columns/{id}` | 作者 | 改专栏；`POST /columns/{id}/delete` 由作者或 `topic.moderate` 删 |
 | `GET` | `/feed` | 公开 | 动态时间线，`?user=` `?after=` `?limit=` |
 | `POST` | `/feed` | 登录用户 | 发一条动态（每人每小时 20 条） |
 | `POST` | `/feed/{id}/delete` | 本人或 `feed.moderate` | 删除 |

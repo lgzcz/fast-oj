@@ -1,0 +1,56 @@
+{{define "content"}}
+<h1>{{if .Data.IsNew}}写{{else}}编辑{{end}}{{if eq .Data.Kind "solution"}}题解{{else}}专栏{{end}}</h1>
+<p class="meta">正文走与题面同一套 Markdown + <code>$KaTeX$</code>；可以先存成草稿（不勾公开）。</p>
+
+{{if .Data.Errors}}
+<div class="flash">
+  {{range .Data.Errors}}<p>{{.}}</p>{{end}}
+</div>
+{{end}}
+
+<form method="post" action="{{.Data.Action}}">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+
+  {{if eq .Data.Kind "solution"}}
+  <label>题目</label>
+  {{if and .Data.IsNew (not .Data.ProblemKey)}}
+  <input type="text" name="problem" maxlength="32" autocomplete="off" spellcheck="false"
+         placeholder="如 P1001" required>
+  {{else}}
+  <input type="text" value="{{.Data.ProblemKey}}　{{.Data.ProblemName}}" disabled>
+  <input type="hidden" name="problem" value="{{.Data.ProblemKey}}">
+  {{end}}
+  {{end}}
+
+  <label>标题</label>
+  <input type="text" name="title" value="{{.Data.Title}}" maxlength="200" required>
+
+  <label class="check">
+    <input type="checkbox" name="visible" value="1" {{if .Data.Visible}}checked{{end}}>
+    公开（不勾 = 只有你自己与审核者看得到）
+  </label>
+
+  <label>正文</label>
+  <textarea name="body" rows="18" maxlength="65536" spellcheck="false" autocomplete="off"
+            placeholder="## 思路&#10;&#10;先说清楚为什么这样做，再贴代码。">{{.Data.Body}}</textarea>
+
+  <p class="row">
+    <input type="submit" value="{{if .Data.IsNew}}发布{{else}}保存{{end}}">
+    <button type="submit" name="preview" value="1">预览</button>
+    <a href="{{.Data.Back}}">取消</a>
+  </p>
+</form>
+
+{{if .Data.Preview}}
+<h2>预览</h2>
+<article class="post-body">{{.Data.Preview}}</article>
+{{end}}
+
+{{if and (not .Data.IsNew) .Data.ID}}
+<form method="post" action="{{.Data.Action}}/delete"
+      onsubmit="return confirm('删掉这篇文章？正文不会留底。')">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <button type="submit" class="danger">删除</button>
+</form>
+{{end}}
+{{end}}

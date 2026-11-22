@@ -99,9 +99,54 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /problems/{key}/cases/{id}/delete", s.handleCaseDelete)
 	mux.HandleFunc("GET /problems/{key}/cases/{name}/{which}", s.handleCaseBody)
 	mux.HandleFunc("GET /problems/{key}/topics", s.handleProblemTopics)
+	mux.HandleFunc("GET /problems/{key}/solutions", s.handleProblemSolutions)
 	mux.HandleFunc("POST /problems/{key}/favorite", s.handleFavoriteToggle)
 	mux.HandleFunc("GET /favorites", s.handleFavorites)
 	mux.HandleFunc("GET /review", s.handleReview)
+
+	// 题解与专栏共用一套处理器；kind 由路由固定，表单里没有可以伪造的字段。
+	mux.HandleFunc("GET /solutions", func(w http.ResponseWriter, r *http.Request) {
+		s.handleArticleList(w, r, store.ArticleSolution)
+	})
+	mux.HandleFunc("GET /solutions/new", func(w http.ResponseWriter, r *http.Request) {
+		s.handleArticleNew(w, r, store.ArticleSolution)
+	})
+	mux.HandleFunc("POST /solutions", func(w http.ResponseWriter, r *http.Request) {
+		s.handleArticleCreate(w, r, store.ArticleSolution)
+	})
+	mux.HandleFunc("GET /solutions/{id}", func(w http.ResponseWriter, r *http.Request) {
+		s.handleArticleGet(w, r, store.ArticleSolution)
+	})
+	mux.HandleFunc("GET /solutions/{id}/edit", func(w http.ResponseWriter, r *http.Request) {
+		s.handleArticleEdit(w, r, store.ArticleSolution)
+	})
+	mux.HandleFunc("POST /solutions/{id}", func(w http.ResponseWriter, r *http.Request) {
+		s.handleArticleUpdate(w, r, store.ArticleSolution)
+	})
+	mux.HandleFunc("POST /solutions/{id}/delete", func(w http.ResponseWriter, r *http.Request) {
+		s.handleArticleDelete(w, r, store.ArticleSolution)
+	})
+	mux.HandleFunc("GET /columns", func(w http.ResponseWriter, r *http.Request) {
+		s.handleArticleList(w, r, store.ArticleColumn)
+	})
+	mux.HandleFunc("GET /columns/new", func(w http.ResponseWriter, r *http.Request) {
+		s.handleArticleNew(w, r, store.ArticleColumn)
+	})
+	mux.HandleFunc("POST /columns", func(w http.ResponseWriter, r *http.Request) {
+		s.handleArticleCreate(w, r, store.ArticleColumn)
+	})
+	mux.HandleFunc("GET /columns/{id}", func(w http.ResponseWriter, r *http.Request) {
+		s.handleArticleGet(w, r, store.ArticleColumn)
+	})
+	mux.HandleFunc("GET /columns/{id}/edit", func(w http.ResponseWriter, r *http.Request) {
+		s.handleArticleEdit(w, r, store.ArticleColumn)
+	})
+	mux.HandleFunc("POST /columns/{id}", func(w http.ResponseWriter, r *http.Request) {
+		s.handleArticleUpdate(w, r, store.ArticleColumn)
+	})
+	mux.HandleFunc("POST /columns/{id}/delete", func(w http.ResponseWriter, r *http.Request) {
+		s.handleArticleDelete(w, r, store.ArticleColumn)
+	})
 
 	// 题单：登录用户都能建，作者（或 problem.edit.any）维护其中的题。
 	mux.HandleFunc("GET /trainings", s.handleTrainingList)
