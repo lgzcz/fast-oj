@@ -302,6 +302,10 @@ func Run(argv []string, dir string, stdin []byte, lim Limits) Execution {
 			TimeMS: timeMS, MemKB: memKB, Exit: exitCode(w.err),
 			Stdout: stdout.Bytes(), Stderr: stderr.Bytes(),
 		}
+		// 过滤器装上了但有降级（旧内核）也要让操作员看见：这不是失败，只是覆盖面变小。
+		if note, ok := lim.jailStatus.Note(); ok {
+			noteSeccompDowngrade(note)
+		}
 		// 牢房没建成不是学生的错：判成 RE 会让他去查自己根本没跑起来的代码。判据只有一条
 		// ——jailer 在这一把的状态信道上留下的那句话（暗号对得上才算，见 jailBrokenFrom）。
 		if reason, broken := jailBrokenFrom(lim.jailStatus, ex.Exit); broken {

@@ -40,9 +40,11 @@ const (
 	ErrPrefix = "OJ-JAIL: "
 	// statusSep 分开状态信道每一行的暗号与它说的是什么。
 	statusSep = "\x1f"
-	// 信道里的两种事实：牢房没能 exec 提交程序（F），以及真的把它 exec 起来了（E）。
+	// 信道里的三种事实：牢房没能 exec 提交程序（F），真的把它 exec 起来了（E），
+	// 以及"装上了但有降级"的说明（W，例如旧内核没有 seccomp(TSYNC)）。
 	statusFail   = "F"
 	statusExeced = "E"
+	statusNote   = "W"
 )
 
 // Status 是那条独立信道。判机用 NewStatus 建，jailer 写，判机读。
@@ -128,6 +130,7 @@ func (s *Status) write(kind, text string) {
 
 func (s *Status) markFail(reason error) { s.write(statusFail, reason.Error()) }
 func (s *Status) markExeced()           { s.write(statusExeced, "") }
+func (s *Status) markNote(note string)  { s.write(statusNote, note) }
 
 // lineWith 取出以"暗号 + 这件事"开头的那一行的正文。别的行一律不算：暗号是这一把一次性
 // 随机的，写得出那一行却写不出暗号，正是这条信道要挡的东西。
@@ -155,6 +158,10 @@ func (s *Status) Failure() (string, bool) { return s.lineWith(statusFail) }
 // Execed 报告牢房是不是已经把提交程序 exec 起来了。判机用它把"jailer 没跑成"与"程序
 // 自己 exit 70"分开口。
 func (s *Status) Execed() bool { _, ok := s.lineWith(statusExeced); return ok }
+
+// Note 报告这一把牢房装上了但有降级（目前只有旧内核的 seccomp 回退）。它不是失败：
+// 运行照常，判机把这句话挂到沙盒备注里，让操作员知道过滤器的覆盖面比标称的小。
+func (s *Status) Note() (string, bool) { return s.lineWith(statusNote) }
 
 // peek 是信道上的原始字节，只给测试与诊断看。
 func (s *Status) peek() ([]byte, error) {

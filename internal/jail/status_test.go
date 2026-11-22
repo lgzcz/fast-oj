@@ -35,6 +35,9 @@ func TestStatusRoundTrip(t *testing.T) {
 	if st.Execed() {
 		t.Error("还没写就该没有 exec 记号")
 	}
+	if _, ok := st.Note(); ok {
+		t.Error("还没写就该没有降级说明")
+	}
 
 	// jailer 那一侧：按 spec 里的路径把写端握过来。
 	w, err := take(Spec{Status: st.Path(), Nonce: st.Nonce()})
@@ -49,6 +52,11 @@ func TestStatusRoundTrip(t *testing.T) {
 	reason, ok := st.Failure()
 	if !ok || reason != "牢房少了一步 mount" {
 		t.Errorf("失败声明读成 %q / %v", reason, ok)
+	}
+	// 降级不是失败：运行照常，但说明必须读得出来，好让 /judges 标注覆盖面。
+	w.markNote("内核不支持 seccomp(TSYNC)")
+	if note, ok := st.Note(); !ok || note != "内核不支持 seccomp(TSYNC)" {
+		t.Errorf("降级说明读成 %q / %v", note, ok)
 	}
 }
 

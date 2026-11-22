@@ -92,6 +92,9 @@ func (e *Execution) fill(w waitResult, out, errBuf *limitedBuffer, g Guard, st *
 	}
 	e.TimeMS, e.MemKB, e.Exit = timeMS, memKB, exitCode(w.err)
 	e.Stdout, e.Stderr = out.Bytes(), errBuf.Bytes()
+	if note, ok := st.Note(); ok {
+		noteSeccompDowngrade(note)
+	}
 	if reason, broken := jailBrokenFrom(st, e.Exit); broken {
 		// 牢房没建起来不是学生的错，也不该由交互器背：报判机故障。
 		note := jailBrokenNote(reason)

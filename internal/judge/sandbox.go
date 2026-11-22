@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/liangbinchen2013/fast-oj/internal/jail"
 )
@@ -51,7 +52,14 @@ var sandbox struct {
 	// probed 是启动自测的结论；note 用来写日志和 /judges 上那行说明。
 	probed sandboxProbe
 	note   string
+	// seccompNote 是"装上了但覆盖面降级"的那句话（旧内核没有 TSYNC）。它来自每次运行
+	// 的状态信道，第一次读到就留下；SandboxNote 会把它接在 note 后面。
+	seccompNote string
+	// 锁单独放：sandbox 这个结构在测试里会被整体复制/还原，带着 sync.Mutex 会被 vet
+	// 拦下（而且复制出来的锁没有意义）。
 }
+
+var sandboxMu sync.Mutex
 
 // SetSandbox 打开（或关掉）判题沙盒。self 是判机可执行文件路径；userNS 为真表示
 // 判机不是 root，牢房要靠非特权 user namespace 撑起来。
@@ -63,14 +71,44 @@ func SetSandbox(self string, mode jail.Mode, userNS bool, uid, gid uint32) {
 	sandbox.mode, sandbox.self, sandbox.userNS = mode, self, userNS
 	sandbox.uid, sandbox.gid = uid, gid
 	sandbox.probed, sandbox.note = probeUnknown, ""
+	sandbox.seccompNote = ""
 }
 
 // SandboxMode 与 SandboxAvailable 给状态展示用。
 func SandboxMode() jail.Mode { return sandbox.mode }
 
-func SandboxAvailable() bool { return sandbox.probed == probeOK }
+func SandboxAvailable() bool {
+	sandboxMu.Lock()
+	defer sandboxMu.Unlock()
+	return sandbox.probed == probeOK
+}
 
-func SandboxNote() string { return sandbox.note }
+func SandboxNote() string {
+	sandboxMu.Lock()
+	defer sandboxMu.Unlock()
+	note := sandbox.note
+	if sandbox.seccompNote != "" && !strings.Contains(note, sandbox.seccompNote) {
+		if note != "" {
+			note += "；"
+		}
+		note += sandbox.seccompNote
+	}
+	return note
+}
+
+// noteSeccompDowngrade 记下第一次在状态信道上读到的降级说明。降级发生在每一次 jailer
+// 里，但操作员只需要知道一次；后续运行重复写同一句话没有意义。
+func noteSeccompDowngrade(note string) {
+	note = strings.TrimSpace(note)
+	if note == "" {
+		return
+	}
+	sandboxMu.Lock()
+	if sandbox.seccompNote == "" {
+		sandbox.seccompNote = note
+	}
+	sandboxMu.Unlock()
+}
 
 // Jailed 回答"这台判机现在会把一次运行关进牢房吗"。收 Python 之前要先问它：护栏
 // （internal/judge/pyguard.py）拦的是"离开这次运行的目录"，而那个边界是 chroot 给的；
@@ -86,6 +124,8 @@ func Jailed() bool {
 // "开不了"只属于 auto：那条路从此不再尝试牢房，判机继续干活，并把"未隔离"这句话
 // 留在日志、/judges 和每次判题的 note 里。悄悄少一层防护与悄悄判死每一条，都不是答案。
 func reportSandbox(ok bool, note string) {
+	sandboxMu.Lock()
+	defer sandboxMu.Unlock()
 	if ok {
 		sandbox.probed = probeOK
 	} else {
@@ -102,12 +142,18 @@ func reportSandbox(ok bool, note string) {
 // 所以这里只停"不再尝试牢房"，把要不要继续干活交给 SandboxBroken 的读者（判机的主循环
 // 会因此退出领单，由 systemd 重启后重新自测）。
 func reportJailBroken(note string) {
+	sandboxMu.Lock()
+	defer sandboxMu.Unlock()
 	sandbox.probed = probeBroken
 	sandbox.note = note
 }
 
 // SandboxBroken 报告判机是不是撞上了"中途建不起牢房"。
-func SandboxBroken() bool { return sandbox.probed == probeBroken }
+func SandboxBroken() bool {
+	sandboxMu.Lock()
+	defer sandboxMu.Unlock()
+	return sandbox.probed == probeBroken
+}
 
 // newJailStatus 建这一把运行的状态信道。不打算建牢房的那些配置与平台返回 nil，
 // 此时 jailBrokenFrom 也无从判断——那正是它的语义：没有牢房，就没有"牢房坏了"。
@@ -145,8 +191,11 @@ func jailBrokenFrom(st *jail.Status, exit int) (string, bool) {
 // probeBroken 也走"不再尝试"这一条，但它是**另一回事**：那次结论来自可信信道，而
 // SandboxBroken 会据此把判机停在领单之外，不留下"继续裸跑"这个选项。
 func jailFor(lim Limits) (jail.Spec, bool) {
+	sandboxMu.Lock()
+	probed := sandbox.probed
+	sandboxMu.Unlock()
 	if sandbox.mode == jail.Off || sandbox.self == "" ||
-		sandbox.probed == probeUnavailable || sandbox.probed == probeBroken {
+		probed == probeUnavailable || probed == probeBroken {
 		return jail.Spec{}, false
 	}
 	procs := lim.MaxProcs

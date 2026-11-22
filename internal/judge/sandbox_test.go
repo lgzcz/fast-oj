@@ -131,6 +131,31 @@ func containsFold(list []string, want string) bool {
 	return false
 }
 
+// 旧内核的 seccomp 降级不能只剩一句"沙盒已启用"：那句话要挂在 /judges 的备注里，
+// 而且同一句话只挂一次。
+func TestSeccompDowngradeLandsInSandboxNote(t *testing.T) {
+	want := sandbox
+	t.Cleanup(func() { sandbox = want })
+
+	SetSandbox("x", jail.Auto, false, 0, 0)
+	reportSandbox(true, "沙盒已启用")
+	noteSeccompDowngrade("内核不支持 seccomp(TSYNC)")
+	got := SandboxNote()
+	if !strings.Contains(got, "沙盒已启用") || !strings.Contains(got, "TSYNC") {
+		t.Fatalf("备注没带上降级：%q", got)
+	}
+	noteSeccompDowngrade("内核不支持 seccomp(TSYNC)")
+	if strings.Count(SandboxNote(), "TSYNC") != 1 {
+		t.Errorf("同一句降级挂了多次：%q", SandboxNote())
+	}
+
+	// 换一套配置就清掉旧结论，和 probed/note 一样。
+	SetSandbox("x", jail.Auto, false, 0, 0)
+	if got := SandboxNote(); got != "" {
+		t.Errorf("换配置后旧降级还留着：%q", got)
+	}
+}
+
 // ECS 上撞到的那件事：启动自测判定"这台开不了牢房"之后，判机仍然给每条工单去建牢房，
 // 于是每条提交都变成 IE。auto 的语义是"能开就开"，不是"开不了就每条都判死"。
 // 三态是必需的：自测本身要靠一次带牢房的运行来完成，只有开/关两档的话它永远测得过。

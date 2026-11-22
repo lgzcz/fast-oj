@@ -36,6 +36,12 @@ const (
 	sysSetns             = 308
 	sysUserfaultfd       = 323
 	sysBpf               = 321
+	sysOpenByHandleAt    = 304
+	sysKeyctl            = 250
+	sysPerfEventOpen     = 298
+	sysIOUringSetup      = 425
+	sysIOUringEnter      = 426
+	sysIOUringRegister   = 427
 	seccompSetModeFilter = 1
 	seccompFlagTsync     = 1
 
@@ -60,6 +66,11 @@ var denied = []uint32{
 
 	syscall.SYS_REBOOT, syscall.SYS_KEXEC_LOAD, syscall.SYS_SWAPON, syscall.SYS_SWAPOFF,
 	sysBpf, sysUserfaultfd,
+	// io_uring 能绕开一部分按 syscall 号布防的检查；它逃不出命名空间，但没必要在
+	// 判题程序里留这条异步 I/O 面。open_by_handle_at 是 mount 命名空间里的一个老口子，
+	// keyctl 与 perf_event_open 都是内核攻击面。
+	sysIOUringSetup, sysIOUringEnter, sysIOUringRegister,
+	sysOpenByHandleAt, sysKeyctl, sysPerfEventOpen,
 
 	syscall.SYS_MOUNT, syscall.SYS_UMOUNT2, syscall.SYS_PIVOT_ROOT, syscall.SYS_CHROOT,
 	sysSetns, syscall.SYS_UNSHARE,
@@ -99,31 +110,35 @@ func program() []syscall.SockFilter {
 //
 // 装不上就按"牢房没建起来"出去（ErrPrefix + FailExit）：判机报判机故障而不是让学生
 // 去改一份没做错的文件——这一层失败是这台机器的配置问题，不是那道题的问题。
-func applySeccomp() error {
+//
+// 返回值里的 note 非空表示过滤器装上了但覆盖面降级（老内核没有 seccomp(2)）：
+// 这不是失败，但操作员必须能在 /judges 的备注里看到，不能只剩一句"沙盒已启用"。
+func applySeccomp() (note string, err error) {
 	// 没特权时装不上过滤器，除非先把"以后再也拿不到特权"说死：内核要求这两件事一起来。
 	if _, _, errno := syscall.RawSyscall6(syscall.SYS_PRCTL, prSetNoNewPrivs, 1, 0, 0, 0, 0); errno != 0 {
-		return fmt.Errorf("prctl(NO_NEW_PRIVS): %w", errno)
+		return "", fmt.Errorf("prctl(NO_NEW_PRIVS): %w", errno)
 	}
 	instr := program()
 	// Go 的 SockFprog.Len 是 uint16：这份名单远小于 65535 条，但加进黑名单的人不该靠
 	// 运气发现溢出，所以这里当场算一遍并要求它待在 uint16 里。
 	if len(instr) > 0xffff {
-		return fmt.Errorf("过滤器 %d 条指令，超过内核单条过滤器的上限", len(instr))
+		return "", fmt.Errorf("过滤器 %d 条指令，超过内核单条过滤器的上限", len(instr))
 	}
 	prog := syscall.SockFprog{Len: uint16(len(instr)), Filter: &instr[0]}
 	// TSYNC：一次装到**所有线程**。Go 与 Python 都是多线程的，而 prctl 那条路只管当前线程
 	// ——剩下那些线程等于没被管过，"看着装了其实没装"是最坏的一种失败。
 	if _, _, errno := syscall.RawSyscall(sysSeccomp, seccompSetModeFilter, seccompFlagTsync,
 		uintptr(unsafe.Pointer(&prog))); errno == 0 {
-		return nil
+		return "", nil
 	} else if errno != syscall.ENOSYS && errno != syscall.EINVAL {
-		return fmt.Errorf("seccomp(TSYNC): %w", errno)
+		return "", fmt.Errorf("seccomp(TSYNC): %w", errno)
 	}
-	// 老内核没有 seccomp(2)：退回 prctl，覆盖面小到当前线程。判机要能在日志里看见这件事，
-	// 所以调用方拿到的是 ok 但操作员看到的备注里没有它——那条路留给 -sandbox=on 的检查。
+	// 老内核没有 seccomp(2)：退回 prctl，只覆盖当前线程。Go 运行时会在 exec 之前就起
+	// 好几个线程，所以这条降级要说出来——把原因写进状态信道，判机把它挂到 /judges 的
+	// 沙盒备注里；否则"沙盒已启用"这句话会盖住一整片没被过滤的线程。
 	if _, _, errno := syscall.RawSyscall6(syscall.SYS_PRCTL, prSetSeccomp, seccompModeFilter,
 		uintptr(unsafe.Pointer(&prog)), 0, 0, 0); errno != 0 {
-		return fmt.Errorf("prctl(SET_SECCOMP): %w", errno)
+		return "", fmt.Errorf("prctl(SET_SECCOMP): %w", errno)
 	}
-	return nil
+	return "内核不支持 seccomp(TSYNC)：过滤器只装到了当前线程（旧内核降级）", nil
 }

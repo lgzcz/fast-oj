@@ -98,8 +98,13 @@ func Enter(spec Spec, st *Status) error {
 	}
 	// seccomp 必须压在 exec 前面最后一件事：牢房自己还要用 unshare/mount/chroot 这些
 	// 被挡的调用，早装一步就死在建牢房半路上。
-	if err := applySeccomp(); err != nil {
+	note, err := applySeccomp()
+	if err != nil {
 		return fmt.Errorf("系统调用过滤装不上: %w", err)
+	}
+	// 降级不是失败：运行继续，但这句说明要跟着状态信道回到判机，进 /judges 的沙盒备注。
+	if note != "" {
+		st.markNote(note)
 	}
 	// exec 之前的最后一笔：留下"提交程序真的被牢房交出去了"的记号。写在 seccomp 之后
 	// 是有意的——过滤器已经装上，这一笔 write 必须在白名单里（write 本来就在）。
