@@ -288,6 +288,13 @@ func failureDetail(v Verdict, note string, ex Execution) string {
 	if note != "" {
 		return note
 	}
+	if v == RE {
+		// Python 护栏的拒绝理由只写在 stderr 里（一行"判机不允许…"）。它比
+		// "exit status 1" 有用，也只挑这一句，不整段回显。
+		if g := guardExcerpt(ex.Stderr); g != "" {
+			return g
+		}
+	}
 	if n := strings.TrimSpace(ex.Note); n != "" {
 		return n
 	}
@@ -298,6 +305,18 @@ func failureDetail(v Verdict, note string, ex Execution) string {
 		return "内存超限"
 	}
 	return strings.TrimSpace(string(ex.Stderr))
+}
+
+// guardExcerpt is the one stderr line the judge is willing to repeat for an RE:
+// the Python guard's refusal. Anything else in stderr is the program's own output.
+func guardExcerpt(stderr []byte) string {
+	for _, line := range strings.Split(string(stderr), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, "判机不允许") {
+			return clipText(line, 200)
+		}
+	}
+	return ""
 }
 
 // severity orders verdicts so the most informative one wins when several cases

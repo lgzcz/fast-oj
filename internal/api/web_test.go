@@ -403,7 +403,8 @@ func TestProblemListViewForBrowsers(t *testing.T) {
 		t.Error("a formula-free page still loaded KaTeX")
 	}
 	if code, math := h.htmlGet("/static/math.js", ""); code != http.StatusOK ||
-		!strings.Contains(math, `/static/katex.min.js`) || strings.Contains(math, "cdn.jsdelivr.net") {
+		!strings.Contains(math, `"/static/"`) || !strings.Contains(math, "katex.min.js") ||
+		strings.Contains(math, "cdn.jsdelivr.net") {
 		t.Errorf("math.js should load KaTeX from this origin (%d)", code)
 	}
 	// A hidden problem is invisible to an anonymous browser, visible to admin.

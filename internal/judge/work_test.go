@@ -238,6 +238,13 @@ func TestFailureDetailDoesNotLeakStderrForReAndMle(t *testing.T) {
 		!strings.Contains(got, "7") {
 		t.Errorf("RE without a note = %q", got)
 	}
+	// Python 护栏那句拒绝理由要留着：它是 RE 的唯一可读原因，且不含输入。
+	guard := Execution{Verdict: RE, Exit: 1,
+		Stderr: []byte("Traceback...\nImportError: 判机不允许 import subprocess\nhidden input 42\n")}
+	if got := failureDetail(RE, "", guard); !strings.Contains(got, "判机不允许") ||
+		strings.Contains(got, "hidden input") {
+		t.Errorf("guard detail = %q", got)
+	}
 	if got := failureDetail(MLE, "", Execution{Verdict: MLE, Stderr: []byte(secret)}); got == "" ||
 		strings.Contains(got, "hidden input") {
 		t.Errorf("MLE detail = %q", got)
