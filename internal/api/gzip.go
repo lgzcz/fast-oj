@@ -24,7 +24,10 @@ func gzipResponses(next http.Handler) http.Handler {
 		// cache must never hand a gzipped body to a client that cannot decode it,
 		// nor the reverse.
 		w.Header().Set("Vary", "Accept-Encoding")
-		if r.Method == http.MethodHead || !wantsGzip(r) {
+		// 判机协议不压缩：用例文件是 text/plain，可能几十 MB，压缩前这里要先收进
+		// 内存再压一份；判机端也关掉了自动解压（见 judgeagent/agent.go），所以这段
+		// 计算连带宽都省不到。小 JSON 回包同理，不值得为它多一次拷贝。
+		if r.Method == http.MethodHead || isJudgeRoute(r) || !wantsGzip(r) {
 			next.ServeHTTP(w, r)
 			return
 		}

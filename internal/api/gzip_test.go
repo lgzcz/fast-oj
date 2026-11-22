@@ -81,6 +81,30 @@ func TestGzipResponsesCompressesOnlyWhatIsWorthIt(t *testing.T) {
 	}
 }
 
+// 判机下载用例是 text/plain，可能几十 MB：这条路径必须在写出之前就绕过压缩，
+// 否则服务端会先整份收进内存再压一份。
+func TestJudgeRoutesAreNotBufferedForGzip(t *testing.T) {
+	body := strings.Repeat("case line\n", 4096)
+	h := gzipResponses(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		_, _ = io.WriteString(w, body)
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/judge/cases/1", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	resp := rec.Result()
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if enc := resp.Header.Get("Content-Encoding"); enc != "" {
+		t.Fatalf("判机路由被压缩了：Content-Encoding=%q", enc)
+	}
+	if string(raw) != body {
+		t.Fatalf("body changed: %d bytes", len(raw))
+	}
+}
+
 func TestStaticAssetsAreVersionedAndCachedForever(t *testing.T) {
 	h := newHarness(t)
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
@@ -23,6 +24,15 @@ const (
 	offByOne     = "#include <iostream>\nint main(){int a,b;std::cin>>a>>b;std::cout<<a+b+1<<std::endl;return 0;}"
 	brokenSource = "int main(){ this is not c++ }"
 )
+
+// 自动 gzip 会把整个用例解压进判机内存；服务端也不为 /judge/ 压缩。
+func TestAgentClientDoesNotAskForGzip(t *testing.T) {
+	e := newEnv(t)
+	tr, ok := e.agent.http.Transport.(*http.Transport)
+	if !ok || !tr.DisableCompression {
+		t.Fatalf("transport = %#v, want DisableCompression", e.agent.http.Transport)
+	}
+}
 
 type env struct {
 	srv   *httptest.Server

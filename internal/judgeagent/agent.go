@@ -94,7 +94,12 @@ func New(cfg Config) (*Agent, error) {
 	}
 	// No client-wide timeout: the deadline belongs to each request's context, so
 	// a long compile is not cut off by a global default.
-	return &Agent{cfg: cfg, http: &http.Client{}}, nil
+	//
+	// 关掉自动 gzip：用例文件是 text/plain，Net/http 的透明解压会把整个文件读进
+	// 内存。服务端也已经不为 /judge/ 压缩，所以这里要的是原样的字节流。
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DisableCompression = true
+	return &Agent{cfg: cfg, http: &http.Client{Transport: transport}}, nil
 }
 
 func (a *Agent) Languages() []string { return a.cfg.Languages }
