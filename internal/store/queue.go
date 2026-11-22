@@ -21,6 +21,9 @@ type ClaimedTask struct {
 	Source      string
 	TimeLimitMS int
 	MemLimitKB  int
+	// InputFile/OutputFile 是文件 IO 题的两个文件名；都空表示 stdin/stdout。
+	InputFile  string
+	OutputFile string
 }
 
 // Caps 是一台判机这次领单时能做的事。它是判机**自报**的（见 Judge.Has），服务器照它派单。
@@ -32,16 +35,18 @@ type Caps struct {
 	Options    bool // 认 submissions.options，会按选的那条命令行编
 	Checker    bool // 会现编并跑题目自带的判题器
 	Interactor bool // 会跑交互器
+	FileIO     bool // 认 input_file/output_file，把输入落盘并按输出文件比较
 }
 
 // CapsAll 是"这台机器什么都会"。测试用它；生产里的 Caps 一律来自判机自报，
 // 没有一个服务器可以自己假设它会。
-var CapsAll = Caps{Options: true, Checker: true, Interactor: true}
+var CapsAll = Caps{Options: true, Checker: true, Interactor: true, FileIO: true}
 
 // Claims 报告这份工单这台机器判得了吗。判不了就不是"降级判"而是"别派给我"：
-// 一台旧判机不认识 options / checker / interactor，派过去它会照自己那套编、按逐字节比较判，
-// 然后正常回报成功——页面上那句「C++14 · O2 关」「本题由 SPJ 判定」就成了当着的谎。
-func (c Caps) Claims(t ClaimedTask, hasChecker, hasInteractor bool) bool {
+// 一台旧判机不认识 options / checker / interactor / file_io，派过去它会照自己那套编、
+// 按逐字节比较判，然后正常回报成功——页面上那句「C++14 · O2 关」「本题由 SPJ 判定」
+// 就成了当着的谎。
+func (c Caps) Claims(t ClaimedTask, hasChecker, hasInteractor, hasFileIO bool) bool {
 	if t.Options != "" && !c.Options {
 		return false
 	}
@@ -49,6 +54,9 @@ func (c Caps) Claims(t ClaimedTask, hasChecker, hasInteractor bool) bool {
 		return false
 	}
 	if hasInteractor && !c.Interactor {
+		return false
+	}
+	if hasFileIO && !c.FileIO {
 		return false
 	}
 	return true
@@ -79,9 +87,11 @@ func (db *DB) ClaimNext(ctx context.Context, judgeID int64, caps Caps) (ClaimedT
 		     AND (NOT EXISTS (SELECT 1 FROM judge_programs jp
 		                          WHERE jp.problem_id=s.problem_id AND jp.kind='interactor'
 		                    AND TRIM(jp.source)<>'') OR ?)
+		     AND (TRIM(COALESCE((SELECT p.io_input FROM problems p WHERE p.id=s.problem_id),''))='' OR ?)
 		   ORDER BY s.id LIMIT 1)
 		 RETURNING id, problem_id, status`,
-		judgeID, nowMS(), boolInt(caps.Options), boolInt(caps.Checker), boolInt(caps.Interactor)).
+		judgeID, nowMS(), boolInt(caps.Options), boolInt(caps.Checker), boolInt(caps.Interactor),
+		boolInt(caps.FileIO)).
 		Scan(&t.SubmissionID, &t.ProblemID, &status)
 	if err != nil {
 		return t, notFound(err)
@@ -93,10 +103,12 @@ func (db *DB) ClaimNext(ctx context.Context, judgeID int64, caps Caps) (ClaimedT
 	// Source can be large, so it is fetched only now, for the judge that owns
 	// the row.
 	err = db.SQL.QueryRowContext(ctx,
-		`SELECT s.language, s.options, s.source, p.pid, p.time_limit_ms, p.mem_limit_kb
+		`SELECT s.language, s.options, s.source, p.pid, p.time_limit_ms, p.mem_limit_kb,
+		        IFNULL(p.io_input, ''), IFNULL(p.io_output, '')
 		 FROM submissions s JOIN problems p ON p.id=s.problem_id
 		 WHERE s.id=? AND s.judge_id=?`, t.SubmissionID, judgeID).
-		Scan(&t.Language, &t.Options, &t.Source, &t.PID, &t.TimeLimitMS, &t.MemLimitKB)
+		Scan(&t.Language, &t.Options, &t.Source, &t.PID, &t.TimeLimitMS, &t.MemLimitKB,
+			&t.InputFile, &t.OutputFile)
 	if err != nil {
 		return t, notFound(err)
 	}

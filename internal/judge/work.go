@@ -2,6 +2,8 @@ package judge
 
 import (
 	"bytes"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -33,6 +35,10 @@ type Task struct {
 	// Interactor 是题目自带、已经编好的交互器命令行。交互题由它判定：这时候既不比字节，
 	// 也不再跑判题器（两个同时配上会被判机拒绝，见 judgeagent）。
 	Interactor []string
+	// InputFile/OutputFile 是文件 IO 题的两个文件名。输入文件由判机写进工作目录，
+	// 程序跑完后判机读输出文件与答案比较，stdout 不再参与判定。都为空 = stdin/stdout。
+	InputFile  string
+	OutputFile string
 	Cases      []Case
 }
 
@@ -144,6 +150,14 @@ func Judge(task Task, tool Tool, dir string, drop *DropTo, onProgress Progress) 
 		rep.Detail = "problem " + task.PID + " has no test cases"
 		return rep
 	}
+	if err := ValidateIOFiles(task.InputFile, task.OutputFile); err != nil {
+		rep.Detail = "problem IO: " + err.Error()
+		return rep
+	}
+	if task.InputFile != "" && len(task.Interactor) > 0 {
+		rep.Detail = "problem IO: 文件 IO 与交互题不能同时使用"
+		return rep
+	}
 	if err := PrepareDir(dir, drop); err != nil {
 		rep.Detail = "workdir: " + err.Error()
 		return rep
@@ -226,16 +240,48 @@ func Judge(task Task, tool Tool, dir string, drop *DropTo, onProgress Progress) 
 			ex.TimeMS, ex.TimeMin = duo.TimeMS, duo.User.TimeMin || duo.Interactor.TimeMin
 			v, note = verdictForDuo(duo)
 		default:
-			ex = Run(argv, userDir, tc.Input, runLimits)
+			stdin := tc.Input
+			if task.InputFile != "" {
+				// 文件 IO 题：输入落成题目指定的文件，程序不该再从 stdin 读。
+				if err := writeRunFile(filepath.Join(userDir, task.InputFile), tc.Input); err != nil {
+					rep.Verdict = IE
+					rep.Detail = "写输入文件 " + task.InputFile + ": " + err.Error()
+					return rep
+				}
+				// 上一组用例可能留下同名输出（同一目录连续跑）；先清掉，免得把旧答案
+				// 当成这一组的输出。RemoveAll 对符号链接只删链接本身。
+				if err := os.RemoveAll(filepath.Join(userDir, task.OutputFile)); err != nil {
+					rep.Verdict = IE
+					rep.Detail = "清理输出文件 " + task.OutputFile + ": " + err.Error()
+					return rep
+				}
+				stdin = nil
+			}
+			ex = Run(argv, userDir, stdin, runLimits)
 			v = ex.Verdict
+			out := ex.Stdout
+			if v == AC && task.OutputFile != "" {
+				body, tooBig, err := readCaseOutput(userDir, task.OutputFile)
+				switch {
+				case errors.Is(err, os.ErrNotExist):
+					v, note = WA, "程序没有生成输出文件 "+task.OutputFile
+				case err != nil:
+					v, note = WA, "读取输出文件 "+task.OutputFile+" 失败: "+err.Error()
+				case tooBig:
+					v, note = WA, "输出文件超过 "+strconv.Itoa(MaxOutput)+" 字节"
+				default:
+					out = body
+				}
+			}
 			if v == AC {
 				switch {
 				case len(task.SPJ) > 0:
 					// 判题器要读的输入/输出/答案只落在 checker 自己的根里；选手的根里只有
-					// 它自己的源码与二进制。
-					v, note = checkWithSPJ(task.SPJ, filepath.Join(dir, AuxChecker), tc, ex.Stdout, drop)
-				case !OutputsMatch(ex.Stdout, tc.Expected):
-					v, note = WA, diffExcerpt(ex.Stdout, tc.Expected)
+					// 它自己的源码与二进制。文件 IO 题的输出已经读到内存，交给判题器当
+					// 选手输出，两个根依旧分开。
+					v, note = checkWithSPJ(task.SPJ, filepath.Join(dir, AuxChecker), tc, out, drop)
+				case !OutputsMatch(out, tc.Expected):
+					v, note = WA, diffExcerpt(out, tc.Expected)
 				}
 			}
 		}
@@ -285,6 +331,33 @@ func Judge(task Task, tool Tool, dir string, drop *DropTo, onProgress Progress) 
 		rep.Verdict = worst
 	}
 	return rep
+}
+
+// readCaseOutput 读文件 IO 题的输出。它只认普通文件：一个 fifo 或设备文件能让
+// 判定这一步永远读下去，而程序已经退出，那会把整台判机钉死在一道题上。
+// 超过 MaxOutput 的输出已经不可能与答案相同，按 WA 处理，读也只读这么一点。
+func readCaseOutput(dir, name string) (body []byte, tooBig bool, err error) {
+	path := filepath.Join(dir, name)
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, false, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, false, errors.New("不是普通文件")
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, false, err
+	}
+	defer f.Close()
+	body, err = io.ReadAll(io.LimitReader(f, MaxOutput+1))
+	if err != nil {
+		return nil, false, err
+	}
+	if len(body) > MaxOutput {
+		return body[:MaxOutput], true, nil
+	}
+	return body, false, nil
 }
 
 // failureDetail is what the first failing case gets to say. stderr is the program's

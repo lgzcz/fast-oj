@@ -11,6 +11,7 @@
   <li>用例上传与判题程序包加了压缩预算：超过站点配置或内建上限会直接拒绝，而不是先解压再说。</li>
   <li>比赛进行中会冻结比赛内的题目与用例编辑，避免边打边改。</li>
   <li>权限：改角色需要 <code>permission.manage</code>；不能封禁或注销还持有管理侧权限的账号。</li>
+  <li>题目支持文件 IO：成对填写输入/输出文件名（如 <code>game.in</code> / <code>game.out</code>），判机按文件比较，不再只看 stdout；样例页会标出这两个文件名。文件 IO 与交互题不能同时使用。</li>
   <li>提交里的 <code>#pragma GCC optimize/target</code>、<code>_Pragma</code> 与 <code>__attribute__((optimize/target))</code> 不再能改写判题固定的编译口径，会按编译错误拒绝并写明原因。</li>
   <li>安全：管理操作与受限动作的审计写入加上每 IP 预算，避免被刷成写放大；会话过期记录会定期清理。</li>
 </ul>

@@ -68,6 +68,7 @@ func (s *Server) handleJudgeClaim(w http.ResponseWriter, r *http.Request) {
 		Options:    j.Has(protocol.CapOptions),
 		Checker:    j.Has(protocol.CapChecker),
 		Interactor: j.Has(protocol.CapInteractor),
+		FileIO:     j.Has(protocol.CapFileIO),
 	})
 	if errors.Is(err, store.ErrNotFound) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"queue": "empty", "judge": j.Name})
@@ -92,6 +93,7 @@ func (s *Server) handleJudgeClaim(w http.ResponseWriter, r *http.Request) {
 		SubmissionID: task.SubmissionID, PID: task.PID, Language: task.Language,
 		Options: task.Options,
 		Source:  task.Source, TimeLimitMS: task.TimeLimitMS, MemLimitKB: task.MemLimitKB,
+		InputFile: task.InputFile, OutputFile: task.OutputFile,
 	}
 	// 判题器与交互器跟着工单走：判机必须用**自己那套工具链**现编它们，别处编好的二进制
 	// 带着另一套 libc，判出来的东西和判这台机器上学生程序的不是同一件事。
@@ -124,6 +126,9 @@ func programsCarried(t protocol.Task) string {
 	}
 	if t.Interactor != nil {
 		extra += "，含交互器"
+	}
+	if t.InputFile != "" {
+		extra += "，文件 IO " + t.InputFile + "→" + t.OutputFile
 	}
 	if n := len(t.Cases); n > 0 {
 		extra += fmt.Sprintf("，用例 %d 条", n)

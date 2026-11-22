@@ -277,12 +277,14 @@ type problemData struct {
 	// Versions 是提交页上的版本下拉：每根轴一份候选，值与判机的候选表同源。
 	Versions []versionAxis
 	// Mode 是题面页上那句"这题怎么判"（SPJ / 交互题）。普通题是空串，不打扰学生。
-	Mode        string
-	JudgedCases int
-	TotalScore  int
-	Solved      int
-	Submits     int
-	Hidden      bool
+	Mode string
+	// InputFile/OutputFile 非空表示文件 IO 题：样例与题面要写清程序该读写哪个文件。
+	InputFile, OutputFile string
+	JudgedCases           int
+	TotalScore            int
+	Solved                int
+	Submits               int
+	Hidden                bool
 	// CanEdit and CanCases are what the page shows the authoring links for: owning
 	// a problem is enough for both, testcase.manage only buys the case page.
 	CanEdit  bool
@@ -427,7 +429,8 @@ func (s *Server) problemPage(w http.ResponseWriter, r *http.Request, a actor, p 
 		Time: formatMS(p.TimeLimitMS, false), Mem: formatKB(p.MemLimitKB, false),
 		LangText: langText, Langs: options, Versions: versionAxesFor(options),
 		DifficultyText: store.DifficultyLabel(p.Difficulty), Source: p.Source, Tags: p.Tags,
-		Mode:        modeBadge(programs),
+		Mode:      modeBadge(programs),
+		InputFile: p.InputFile, OutputFile: p.OutputFile,
 		JudgedCases: judged, TotalScore: total,
 		Solved: c.Solved, Submits: c.Submits,
 		Hidden:     !p.Visible,

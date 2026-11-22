@@ -299,6 +299,12 @@ func (s *Server) handleJudgeProgram(w http.ResponseWriter, r *http.Request) {
 		s.backToCases(w, r, p, "源码里不能有空字节")
 		return
 	}
+	// 文件 IO 题的程序按题目指定的文件读写，交互器则靠 stdin/stdout 对话：
+	// 两者同时存在时判机没法同时满足，所以在保存交互器这一刻就拒绝。
+	if kind == store.ProgramInteractor && strings.TrimSpace(src) != "" && p.InputFile != "" {
+		s.backToCases(w, r, p, "这道题用了文件 IO（"+p.InputFile+" / "+p.OutputFile+"），不能再配交互器；先在编辑题面里把文件 IO 留空")
+		return
+	}
 	if err := s.db.PutJudgeProgram(r.Context(), store.JudgeProgram{
 		ProblemID: p.ID, Kind: kind, Language: lang, Source: src,
 	}); err != nil {

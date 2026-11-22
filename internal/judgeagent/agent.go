@@ -400,6 +400,7 @@ func (a *Agent) ProcessOnce(ctx context.Context) (bool, error) {
 	rep := judge.Judge(judge.Task{
 		SubmissionID: task.SubmissionID, PID: task.PID, Language: task.Language,
 		Source: task.Source, TimeLimitMS: task.TimeLimitMS, MemLimitKB: task.MemLimitKB,
+		InputFile: task.InputFile, OutputFile: task.OutputFile,
 		SPJ: spj, Interactor: itx, Cases: cases,
 	}, tool, dir, a.cfg.RunAs, judge.Progress(progress))
 	a.cfg.Logf("sid=%d verdict=%s score=%d/%d time=%dms mem=%dKB wall=%s%s",

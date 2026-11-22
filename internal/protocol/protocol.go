@@ -8,11 +8,12 @@ const (
 	CapOptions    = "options"    // 认 submissions.options，按选的那条命令行编
 	CapChecker    = "checker"    // 会现编并跑题目自带的判题器（SPJ）
 	CapInteractor = "interactor" // 会跑交互器（交互题）
+	CapFileIO     = "file_io"    // 认 input_file/output_file：把输入落盘、按输出文件比较
 )
 
 // Capabilities 是**这一版**判机会做的事。它写在代码里而不是配置里：能让操作员调的就
 // 不是"我会不会"，而是谎。
-var Capabilities = []string{CapOptions, CapChecker, CapInteractor}
+var Capabilities = []string{CapOptions, CapChecker, CapInteractor, CapFileIO}
 
 // KnownCapability 报告这个词在词表里。服务器拿它校验自报的名单，不让一个拼错的词
 // 把整台判机的能力描述改掉。
@@ -76,7 +77,11 @@ type Task struct {
 	Source      string      `json:"source"`
 	TimeLimitMS int         `json:"time_limit_ms"`
 	MemLimitKB  int         `json:"mem_limit_kb"`
-	Cases       []Case      `json:"cases"`
+	// InputFile/OutputFile 是文件 IO 题的两个文件名；空表示 stdin/stdout。
+	// 旧判机不认这两个字段也不会自报 file_io，服务器不会把这类工单派给它。
+	InputFile  string `json:"input_file,omitempty"`
+	OutputFile string `json:"output_file,omitempty"`
+	Cases      []Case `json:"cases"`
 }
 
 // Status is a progress report while a submission is in flight.

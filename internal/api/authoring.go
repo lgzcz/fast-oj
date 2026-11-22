@@ -10,6 +10,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/liangbinchen2013/fast-oj/internal/judge"
 	"github.com/liangbinchen2013/fast-oj/internal/store"
 )
 
@@ -41,6 +42,10 @@ type problemForm struct {
 	Difficulty int
 	Source     string
 	Tags       string
+	// 文件 IO：两个都空走 stdin/stdout，都填时判机把输入落成 InputFile、
+	// 跑完读 OutputFile 比较。
+	InputFile  string
+	OutputFile string
 }
 
 func (f problemForm) memKB() int { return int(f.MemMB*1024 + 0.5) }
@@ -50,14 +55,16 @@ func (f problemForm) memKB() int { return int(f.MemMB*1024 + 0.5) }
 // typed, so validation cannot stop at the first field.
 func parseProblemForm(r *http.Request) (problemForm, []string) {
 	f := problemForm{
-		PID:       strings.TrimSpace(r.FormValue("pid")),
-		Detail:    r.FormValue("detail"),
-		Title:     strings.TrimSpace(r.FormValue("title")),
-		Statement: r.FormValue("statement"),
-		Langs:     r.Form["languages"],
-		Visible:   r.FormValue("visible") == "1",
-		Source:    strings.TrimSpace(r.FormValue("source")),
-		Tags:      strings.TrimSpace(r.FormValue("tags")),
+		PID:        strings.TrimSpace(r.FormValue("pid")),
+		Detail:     r.FormValue("detail"),
+		Title:      strings.TrimSpace(r.FormValue("title")),
+		Statement:  r.FormValue("statement"),
+		Langs:      r.Form["languages"],
+		Visible:    r.FormValue("visible") == "1",
+		Source:     strings.TrimSpace(r.FormValue("source")),
+		Tags:       strings.TrimSpace(r.FormValue("tags")),
+		InputFile:  strings.TrimSpace(r.FormValue("io_input")),
+		OutputFile: strings.TrimSpace(r.FormValue("io_output")),
 	}
 	var errs []string
 	if ms, err := strconv.Atoi(strings.TrimSpace(r.FormValue("time_ms"))); err != nil {
@@ -82,6 +89,9 @@ func parseProblemForm(r *http.Request) (problemForm, []string) {
 	}
 	if _, err := store.NormalizeProblemTags(f.Tags); err != nil {
 		errs = append(errs, "标签："+err.Error())
+	}
+	if err := judge.ValidateIOFiles(f.InputFile, f.OutputFile); err != nil {
+		errs = append(errs, err.Error())
 	}
 
 	if f.PID == "" || len(f.PID) > maxPIDLen {
@@ -118,6 +128,7 @@ func (f problemForm) apply(p *store.Problem) {
 	p.TimeLimitMS, p.MemLimitKB, p.Visible = f.TimeMS, f.memKB(), f.Visible
 	p.Languages = f.Langs
 	p.Difficulty, p.Source = f.Difficulty, strings.TrimSpace(f.Source)
+	p.InputFile, p.OutputFile = f.InputFile, f.OutputFile
 	if tags, err := store.NormalizeProblemTags(f.Tags); err == nil {
 		p.Tags = store.SplitTags(tags)
 	} else {
@@ -140,14 +151,15 @@ type editData struct {
 	Preview        template.HTML
 	Visible, IsNew bool
 	// Detail is the chosen 详情级别 and DetailOptions the selector next to it.
-	Detail               string
-	DetailOptions        []detailOption
-	Difficulty           int
-	DifficultyOptions    []string
-	Source, Tags         string
-	Cases, Judged, Total int
-	Langs                []editRow
-	Errors               []string
+	Detail                string
+	DetailOptions         []detailOption
+	Difficulty            int
+	DifficultyOptions     []string
+	Source, Tags          string
+	InputFile, OutputFile string
+	Cases, Judged, Total  int
+	Langs                 []editRow
+	Errors                []string
 	// Action is where the form posts and Key is the problem's current pid. Both
 	// stay on the old value while the author is typing a new pid, so a rejected
 	// rename cannot point the links and the post target at a problem that
@@ -164,6 +176,7 @@ func newEditData(p store.Problem, isNew bool) editData {
 		Key:   p.PID, Detail: detailLevel(p.DetailLevel), DetailOptions: detailOptions,
 		Difficulty: p.Difficulty, DifficultyOptions: store.DifficultyOptions(),
 		Source: p.Source, Tags: strings.Join(p.Tags, ","),
+		InputFile: p.InputFile, OutputFile: p.OutputFile,
 	}
 	if isNew {
 		// A brand new problem starts from the limits most OI problems use, so the
@@ -227,6 +240,7 @@ func (d *editData) fillFromForm(f problemForm, errs []string) {
 	d.Detail = detailLevel(f.Detail)
 	d.TimeMS, d.Visible = f.TimeMS, f.Visible
 	d.Difficulty, d.Source, d.Tags = f.Difficulty, f.Source, f.Tags
+	d.InputFile, d.OutputFile = f.InputFile, f.OutputFile
 	d.MemMB = strings.TrimRight(strings.TrimRight(strconv.FormatFloat(f.MemMB, 'f', 3, 64), "0"), ".")
 	d.Errors = errs
 	for i := range d.Langs {
@@ -395,6 +409,20 @@ func (s *Server) handleProblemUpdate(w http.ResponseWriter, r *http.Request) {
 		d.Preview = renderMarkdownHTML(f.Statement)
 		s.page(w, r, http.StatusOK, "编辑 "+p.PID, "problem_edit", a.viewer(), "", d)
 		return
+	}
+	// 交互题靠 stdin/stdout 与选手对话，文件 IO 题要程序读写指定文件；两者同时
+	// 存在时判机无法同时满足，保存这一刻就拒绝，而不是等下一次提交才报判机故障。
+	if f.InputFile != "" {
+		programs, err := s.db.JudgePrograms(r.Context(), p.ID)
+		if err != nil {
+			s.writeStoreError(w, r, err)
+			return
+		}
+		if inter := programs[store.ProgramInteractor]; strings.TrimSpace(inter.Source) != "" {
+			d.fillFromForm(f, append(errs, "文件 IO 与交互题不能同时使用：先撤掉交互器，或把文件 IO 留空"))
+			s.page(w, r, http.StatusBadRequest, "编辑 "+p.PID, "problem_edit", a.viewer(), "", d)
+			return
+		}
 	}
 	// Flipping visibility is publishing, a separate capability from writing the
 	// statement: an author cannot quietly put their problem in front of everyone.

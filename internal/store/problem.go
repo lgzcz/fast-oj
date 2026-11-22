@@ -53,7 +53,7 @@ func (db *DB) TransferProblemOwner(ctx context.Context, problemID, ownerID int64
 
 const problemColumns = `id, pid, title, statement, time_limit_ms, mem_limit_kb, languages,
 		visible, IFNULL(owner_id, 0), created_at, updated_at, IFNULL(detail_level, 'diff'),
-			difficulty, IFNULL(source, ''), IFNULL(tags, '')`
+			difficulty, IFNULL(source, ''), IFNULL(tags, ''), IFNULL(io_input, ''), IFNULL(io_output, '')`
 
 func scanProblem(row scanner) (Problem, error) {
 	var (
@@ -64,7 +64,7 @@ func scanProblem(row scanner) (Problem, error) {
 	)
 	err := row.Scan(&p.ID, &p.PID, &p.Title, &p.Statement, &p.TimeLimitMS, &p.MemLimitKB,
 		&langs, &visibleFlag, &p.OwnerID, &p.CreatedAt, &p.UpdatedAt, &p.DetailLevel,
-		&p.Difficulty, &p.Source, &tags)
+		&p.Difficulty, &p.Source, &tags, &p.InputFile, &p.OutputFile)
 	p.Languages = splitList(langs)
 	p.Tags = splitList(tags)
 	p.Visible = visibleFlag != 0
@@ -121,11 +121,11 @@ func (db *DB) CreateProblem(ctx context.Context, p *Problem) (Problem, error) {
 	p.UpdatedAt = now
 	p.DetailLevel = detailColumn(p.DetailLevel)
 	res, err := db.SQL.ExecContext(ctx,
-		`INSERT INTO problems (pid, title, statement, time_limit_ms, mem_limit_kb, languages, visible, owner_id, created_at, updated_at, detail_level, difficulty, source, tags)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO problems (pid, title, statement, time_limit_ms, mem_limit_kb, languages, visible, owner_id, created_at, updated_at, detail_level, difficulty, source, tags, io_input, io_output)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		p.PID, p.Title, p.Statement, p.TimeLimitMS, p.MemLimitKB,
 		joinList(p.Languages), boolInt(p.Visible), nullInt64(p.OwnerID), p.CreatedAt, p.UpdatedAt,
-		detailColumn(p.DetailLevel), p.Difficulty, p.Source, joinList(p.Tags))
+		detailColumn(p.DetailLevel), p.Difficulty, p.Source, joinList(p.Tags), p.InputFile, p.OutputFile)
 	if err != nil {
 		return Problem{}, conflict(err, "pid "+p.PID)
 	}
@@ -137,11 +137,11 @@ func (db *DB) UpdateProblem(ctx context.Context, p Problem) (Problem, error) {
 	p.UpdatedAt = nowMS()
 	res, err := db.SQL.ExecContext(ctx,
 		`UPDATE problems SET pid=?, title=?, statement=?, time_limit_ms=?, mem_limit_kb=?, languages=?, visible=?, updated_at=?, detail_level=?,
-		   difficulty=?, source=?, tags=?
+		   difficulty=?, source=?, tags=?, io_input=?, io_output=?
 		 WHERE id=?`,
 		p.PID, p.Title, p.Statement, p.TimeLimitMS, p.MemLimitKB,
 		joinList(p.Languages), boolInt(p.Visible), p.UpdatedAt, detailColumn(p.DetailLevel),
-		p.Difficulty, p.Source, joinList(p.Tags), p.ID)
+		p.Difficulty, p.Source, joinList(p.Tags), p.InputFile, p.OutputFile, p.ID)
 	if err != nil {
 		return Problem{}, conflict(err, "pid "+p.PID)
 	}

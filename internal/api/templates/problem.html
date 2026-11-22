@@ -5,6 +5,7 @@
   时限 <b>{{.Data.Time}}</b> · 内存 <b>{{.Data.Mem}}</b> · 语言 <b>{{.Data.LangText}}</b>
   · 判题用例 <b>{{.Data.JudgedCases}}</b> · 分值 <b>{{.Data.TotalScore}}</b>
   · 通过 <b>{{.Data.Solved}}</b> 人 / 提交 <b>{{.Data.Submits}}</b> 次
+  {{if .Data.InputFile}} · 文件 IO <b>{{.Data.InputFile}}</b> → <b>{{.Data.OutputFile}}</b>{{end}}
   {{if .Data.Hidden}} · <span class="hidden">未公开</span>{{end}}
 </p>
 
@@ -40,7 +41,9 @@
 <h2>样例</h2>
 {{range .Data.Samples}}
 <h3>{{.Name}}</h3>
+{{if $.Data.InputFile}}<p class="meta">输入文件 <code>{{$.Data.InputFile}}</code></p>{{end}}
 <pre><code>{{.In}}</code></pre>
+{{if $.Data.OutputFile}}<p class="meta">输出文件 <code>{{$.Data.OutputFile}}</code></p>{{end}}
 <pre><code>{{.Out}}</code></pre>
 {{end}}
 {{end}}

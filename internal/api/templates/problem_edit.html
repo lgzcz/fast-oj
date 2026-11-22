@@ -32,6 +32,19 @@
 
   <div class="row">
     <div>
+      <label>输入文件名（可选）</label>
+      <input type="text" name="io_input" value="{{.Data.InputFile}}" maxlength="64" autocomplete="off" spellcheck="false" placeholder="留空走 stdin，例：game.in">
+    </div>
+    <div>
+      <label>输出文件名（可选）</label>
+      <input type="text" name="io_output" value="{{.Data.OutputFile}}" maxlength="64" autocomplete="off" spellcheck="false" placeholder="留空走 stdout，例：game.out">
+    </div>
+  </div>
+  <p class="meta">文件 IO 要成对填写：判机会把每组输入写成<code>输入文件名</code>，跑完读<code>输出文件名</code>与答案比较。
+    不支持目录（就是当前目录里的一个平坦文件名），不能与交互题同时使用。</p>
+
+  <div class="row">
+    <div>
       <label>难度</label>
       <select name="difficulty">
         {{range $i, $label := .Data.DifficultyOptions}}

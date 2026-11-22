@@ -77,6 +77,10 @@ type Problem struct {
 	Difficulty int      `json:"difficulty"`
 	Source     string   `json:"source,omitempty"`
 	Tags       []string `json:"tags,omitempty"`
+	// InputFile/OutputFile 是文件 IO 题的两个文件名（形如 game.in / game.out）。
+	// 都为空表示走 stdin/stdout；判机把输入落成 InputFile，跑完读 OutputFile 比较。
+	InputFile  string `json:"input_file,omitempty"`
+	OutputFile string `json:"output_file,omitempty"`
 	// DetailLevel is how much of the judging detail the submitter gets to see:
 	// none, case, diff or full. The author and the operator always see everything.
 	DetailLevel string `json:"detail_level"`
