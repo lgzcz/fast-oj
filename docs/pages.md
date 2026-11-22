@@ -24,6 +24,7 @@
 | `POST` | `/problems/{key}/attachments` | 该题 owner 或 `problem.edit.any` | 传附件（PDF / 图片 / zip / 文本，单文件 ≤ 16MB，每题 20 个） |
 | `POST` | `/problems/{key}/attachments/{id}/delete` | 同上 | 删一个附件（连带落盘文件） |
 | `POST` | `/problems/{key}/submit` | 登录用户 | 网页表单提交 |
+| `GET` | `/search` | 公开 | 全局搜索：题目、文章、题单、用户，每类前 10 条（`?q=`） |
 | `GET` | `/objective` | 公开 | 客观题列表；未发布的只对作者与 `problem.edit.any` 出现 |
 | `GET` `/POST` | `/objective/new` `/objective` | `problem.create` | 建一套单选自测（题目每行 `题目\|选项\|…\|答案字母`） |
 | `GET` | `/objective/{id}` | 公开（未发布限作者） | 读题；登录后出现作答表单 |

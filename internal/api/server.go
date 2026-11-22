@@ -75,6 +75,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /updates", s.handleUpdates)
 	mux.HandleFunc("GET /sitemap.xml", s.handleSitemap)
 
+	mux.HandleFunc("GET /search", s.handleSearch)
+
 	mux.HandleFunc("GET /problems", s.handleProblemList)
 	mux.HandleFunc("GET /problems/new", s.handleProblemNew)
 	mux.HandleFunc("POST /problems", s.handleProblemCreate)
@@ -404,6 +406,7 @@ func (s *Server) handleAbout(w http.ResponseWriter, r *http.Request) {
 	// lives here rather than in a document that can drift.
 	routes := []string{
 		"  GET  /                        首页：站名 + 首页语 + 动态 + 最新题目",
+		"  GET  /search                  全局搜索：题目、文章、题单、用户（?q=，每类前 10 条）",
 		"  GET  /problems                题库列表（?q= &limit= &after=）",
 		"  GET  /problems/{key}          题面 + 样例 + 提交表单",
 		"  GET  /problems/new            出题表单（problem.create）",

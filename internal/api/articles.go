@@ -58,6 +58,7 @@ func canSeeArticle(a actor, art store.Article) bool {
 
 type articleRow struct {
 	ID           int64
+	Kind         string
 	Title        string
 	Author       string
 	AuthorHandle string
@@ -71,17 +72,17 @@ type articleRow struct {
 }
 
 type articleListData struct {
-	Title     string
-	Kind      string
-	Base      string
-	Rows      []articleRow
-	Query     string
-	Next      int64
-	Limit     int
-	NewLink   string
-	SignedIn  bool
-	EmptyText string
-	Problem   string
+	Title       string
+	Kind        string
+	Base        string
+	Rows        []articleRow
+	Query       string
+	Next        int64
+	Limit       int
+	NewLink     string
+	SignedIn    bool
+	EmptyText   string
+	Problem     string
 	ProblemName string
 }
 
@@ -96,7 +97,7 @@ func (s *Server) articleRows(items []store.Article, a actor) []articleRow {
 			name = "已注销"
 		}
 		out = append(out, articleRow{
-			ID: art.ID, Title: art.Title, Author: name, AuthorHandle: art.AuthorHandle,
+			ID: art.ID, Kind: art.Kind, Title: art.Title, Author: name, AuthorHandle: art.AuthorHandle,
 			Color: art.AuthorColor, When: agoMS(art.CreatedAt), Visible: art.Visible,
 			HasProblem: art.ProblemID != 0, ProblemPID: art.ProblemPID, ProblemTitle: art.ProblemTitle,
 			CanEdit: canDeleteArticle(a, art),
@@ -139,7 +140,7 @@ func (s *Server) handleArticleList(w http.ResponseWriter, r *http.Request, kind 
 		Title: articleKindLabel(kind), Kind: kind, Base: base,
 		Rows: s.articleRows(items, a), Query: search, Limit: limit,
 		Next: nextArticleCursor(items, limit), SignedIn: a.User.ID != 0,
-		NewLink: base + "/new",
+		NewLink:   base + "/new",
 		EmptyText: "还没有" + articleKindLabel(kind) + "。",
 	}
 	s.page(w, r, http.StatusOK, d.Title, "articles", a.viewer(), msgOf(r), d)
@@ -171,10 +172,10 @@ func (s *Server) handleProblemSolutions(w http.ResponseWriter, r *http.Request) 
 	s.page(w, r, http.StatusOK, "题解 "+p.PID, "articles", a.viewer(), msgOf(r), articleListData{
 		Title: "题解 · " + p.PID + " " + p.Title, Kind: store.ArticleSolution, Base: "/solutions",
 		Rows: s.articleRows(items, a), Limit: limit, Next: nextArticleCursor(items, limit),
-		SignedIn: a.User.ID != 0,
-		NewLink:  "/solutions/new?problem=" + url.QueryEscape(p.PID),
+		SignedIn:  a.User.ID != 0,
+		NewLink:   "/solutions/new?problem=" + url.QueryEscape(p.PID),
 		EmptyText: "这道题还没有题解。",
-		Problem: p.PID, ProblemName: p.Title,
+		Problem:   p.PID, ProblemName: p.Title,
 	})
 }
 
@@ -229,18 +230,18 @@ func (s *Server) handleArticleGet(w http.ResponseWriter, r *http.Request, kind s
 }
 
 type articleForm struct {
-	Kind       string
-	IsNew      bool
-	ID         int64
-	Title      string
-	Body       string
-	ProblemKey string
+	Kind        string
+	IsNew       bool
+	ID          int64
+	Title       string
+	Body        string
+	ProblemKey  string
 	ProblemName string
-	Visible    bool
-	Errors     []string
-	Action     string
-	Back       string
-	Preview    template.HTML
+	Visible     bool
+	Errors      []string
+	Action      string
+	Back        string
+	Preview     template.HTML
 }
 
 func (s *Server) handleArticleNew(w http.ResponseWriter, r *http.Request, kind string) {

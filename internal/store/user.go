@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // BootstrapHandle is the account the operator token maps to. It is not a person:
@@ -74,6 +75,36 @@ func (db *DB) GetUserByHandle(ctx context.Context, handle string) (User, error) 
 func (db *DB) GetUserByID(ctx context.Context, id int64) (User, error) {
 	return scanUser(db.SQL.QueryRowContext(ctx,
 		`SELECT `+userColumns+` FROM users WHERE id=?`, id))
+}
+
+// SearchUsers finds live accounts by handle or display name. Cancelled accounts
+// are left out: their handles are already released for reuse.
+func (db *DB) SearchUsers(ctx context.Context, query string, limit int) ([]User, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return nil, nil
+	}
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+	like := "%" + escapeLike(query) + "%"
+	rows, err := db.SQL.QueryContext(ctx,
+		`SELECT `+userColumns+` FROM users
+		 WHERE status<>'deleted' AND (handle LIKE ? ESCAPE '\' OR display_name LIKE ? ESCAPE '\')
+		 ORDER BY id LIMIT ?`, like, like, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []User
+	for rows.Next() {
+		u, err := scanUser(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
 }
 
 func (db *DB) ListUsers(ctx context.Context, limit int) ([]User, error) {

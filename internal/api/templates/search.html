@@ -1,0 +1,86 @@
+{{define "content"}}
+<h1>搜索</h1>
+<p class="meta">同时查题目、文章、题单与用户，每类最多 10 条。私信、工单与未发布内容不参与。</p>
+
+<form class="home-search" method="get" action="/search">
+  <label for="search-query">关键词</label>
+  <div class="search-field">
+    <input id="search-query" type="search" name="q" value="{{.Data.Query}}" placeholder="题目编号、标题、文章、题单或用户名" autofocus>
+    <input type="submit" value="搜索">
+  </div>
+</form>
+
+{{if .Data.Query}}
+<p class="meta">「{{.Data.Query}}」共 {{.Data.Count}} 条结果。</p>
+{{end}}
+
+{{if .Data.Problems}}
+<h2>题目（{{len .Data.Problems}}）</h2>
+<div class="table-scroll" role="region" aria-label="题目结果" tabindex="0">
+<table>
+  <tr><th>编号</th><th>标题</th><th>难度</th><th>来源</th></tr>
+  {{range .Data.Problems}}
+  <tr>
+    <td><a href="/problems/{{.PID}}">{{.PID}}</a></td>
+    <td><a href="/problems/{{.PID}}">{{.Title}}</a>{{if not .Visible}} <span class="hidden">未公开</span>{{end}}</td>
+    <td>{{.Difficulty}}</td>
+    <td>{{.Source}}</td>
+  </tr>
+  {{end}}
+</table>
+</div>
+{{end}}
+
+{{if .Data.Articles}}
+<h2>文章（{{len .Data.Articles}}）</h2>
+<div class="table-scroll" role="region" aria-label="文章结果" tabindex="0">
+<table>
+  <tr><th>标题</th><th>类型</th><th>作者</th><th>时间</th></tr>
+  {{range .Data.Articles}}
+  <tr>
+    <td><a href="/{{if eq .Kind "solution"}}solutions{{else}}columns{{end}}/{{.ID}}">{{.Title}}</a>{{if not .Visible}} <span class="hidden">草稿</span>{{end}}</td>
+    <td>{{if eq .Kind "solution"}}题解{{else}}专栏{{end}}</td>
+    <td>{{if .AuthorHandle}}<a class="pt-{{.Color}}" href="/u/{{.AuthorHandle}}">{{.Author}}</a>{{else}}{{.Author}}{{end}}</td>
+    <td>{{.When}}</td>
+  </tr>
+  {{end}}
+</table>
+</div>
+{{end}}
+
+{{if .Data.Trainings}}
+<h2>题单（{{len .Data.Trainings}}）</h2>
+<div class="table-scroll" role="region" aria-label="题单结果" tabindex="0">
+<table>
+  <tr><th>标题</th><th class="num">题数</th><th>作者</th><th>时间</th></tr>
+  {{range .Data.Trainings}}
+  <tr>
+    <td><a href="/trainings/{{.ID}}">{{.Title}}</a>{{if not .Visible}} <span class="hidden">未公开</span>{{end}}</td>
+    <td class="num">{{.Problems}}</td>
+    <td>{{if .OwnerHandle}}<a href="/u/{{.OwnerHandle}}">{{.Owner}}</a>{{else}}{{.Owner}}{{end}}</td>
+    <td>{{.When}}</td>
+  </tr>
+  {{end}}
+</table>
+</div>
+{{end}}
+
+{{if .Data.Users}}
+<h2>用户（{{len .Data.Users}}）</h2>
+<div class="table-scroll" role="region" aria-label="用户结果" tabindex="0">
+<table>
+  <tr><th>用户</th><th>用户名</th></tr>
+  {{range .Data.Users}}
+  <tr>
+    <td><a class="pt-{{.Color}}" href="/u/{{.Handle}}">{{.Name}}</a></td>
+    <td>@{{.Handle}}</td>
+  </tr>
+  {{end}}
+</table>
+</div>
+{{end}}
+
+{{if and .Data.Query (eq .Data.Count 0)}}
+<p class="meta">没有找到「{{.Data.Query}}」。换个编号、标题片段或用户名试试。</p>
+{{end}}
+{{end}}
