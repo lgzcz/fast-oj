@@ -337,6 +337,9 @@ func (s *Server) handleTopicCreate(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.db.RegisterLoginFailure(r.Context(), key, topicWindow); err != nil {
 		s.log.Error("topic counter", "err", err)
 	}
+	// @ 只在正文与标题里认；通知失败不该把已经发出去的帖子变成一张错误页。
+	s.notifyMentions(r.Context(), a, f.Title+"\n"+f.Body,
+		"/topics/"+strconv.FormatInt(topic.ID, 10), "帖子《"+topic.Title+"》", nil)
 	s.log.Info("topic created", "id", topic.ID, "kind", topic.Kind, "by", a.User.Handle)
 	http.Redirect(w, r, "/topics/"+strconv.FormatInt(topic.ID, 10)+"?msg="+url.QueryEscape("已发布"), http.StatusSeeOther)
 }
@@ -528,6 +531,10 @@ func (s *Server) handleTopicComment(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, err := s.db.RegisterLoginFailure(r.Context(), key, topicWindow); err != nil {
 		s.log.Error("comment counter", "err", err)
+	}
+	// 评论成功之后才通知：被拒绝的评论不该让楼主收到一条"有人回复"。
+	if topic, err := s.db.GetTopic(r.Context(), id); err == nil {
+		s.notifyTopicReply(r.Context(), a, topic, comment.Body)
 	}
 	s.log.Info("topic comment", "id", comment.ID, "topic", comment.TopicID, "by", a.User.Handle)
 	http.Redirect(w, r, fmt.Sprintf("/topics/%d?msg=%s", id, url.QueryEscape("已发布评论")), http.StatusSeeOther)

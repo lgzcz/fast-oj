@@ -127,6 +127,7 @@ func (s *Server) handlePostCreate(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.db.RegisterLoginFailure(r.Context(), key, postWindow); err != nil {
 		s.log.Error("post counter", "err", err)
 	}
+	s.notifyMentions(r.Context(), a, post.Body, "/feed", "动态", nil)
 	s.log.Info("post created", "id", post.ID, "by", a.User.Handle)
 	http.Redirect(w, r, "/feed?msg="+url.QueryEscape("已发布"), http.StatusSeeOther)
 }

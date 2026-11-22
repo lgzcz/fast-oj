@@ -59,6 +59,7 @@
 | `GET` | `/u/{handle}/followers` | 公开 | 粉丝名单 |
 | `POST` | `/u/{handle}/follow` | 登录用户 | 关注；`/unfollow` 取消 |
 | `GET` | `/messages` | 登录用户 | 我的私信会话列表（未读数在最后一条那列） |
+| `GET` | `/notifications` | 登录用户 | 站内通知：回复我的帖子、@ 我的人；`POST /notifications/read` 全部标为已读（带 CSRF） |
 | `GET` | `/messages/{handle}` | 登录用户 | 一对一对话，打开即标记已读 |
 | `POST` | `/messages/{handle}` | 登录用户 | 发一条私信（受对方收信策略限制） |
 | `POST` | `/settings/privacy` | 登录用户 | 设置谁可以给我发私信 |

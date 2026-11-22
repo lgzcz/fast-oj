@@ -1,0 +1,28 @@
+{{define "content"}}
+<h1>通知</h1>
+<p class="meta">未读 <b>{{.Data.Unread}}</b> 条 · 这里是最近 {{.Data.Shown}} 条</p>
+
+{{if .Data.Unread}}
+<form class="inline" method="post" action="/notifications/read">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <button type="submit">全部标为已读</button>
+</form>
+{{end}}
+
+{{if .Data.Rows}}
+<div class="table-scroll" role="region" aria-label="数据表格" tabindex="0">
+<table>
+  <tr><th>类型</th><th>内容</th><th>时间</th></tr>
+  {{range .Data.Rows}}
+  <tr>
+    <td><span class="badge">{{.KindLabel}}</span>{{if .Unread}} <span class="badge bad">未读</span>{{end}}</td>
+    <td><a href="{{.Link}}">{{.Summary}}</a></td>
+    <td>{{.When}}</td>
+  </tr>
+  {{end}}
+</table>
+</div>
+{{else}}
+<p class="meta">还没有通知。有人回复你的帖子，或者在帖子和动态里 @ 你时，会出现在这里。</p>
+{{end}}
+{{end}}

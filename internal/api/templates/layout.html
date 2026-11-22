@@ -22,6 +22,7 @@
   </div>
   {{if .Me}}
   <div class="me">
+    <a class="inbox-link" href="/notifications"{{if eq .Section "notifications"}} aria-current="page"{{end}}>通知{{if .Me.Notices}} <b class="badge bad">{{.Me.Notices}}</b>{{end}}</a>
     <a class="inbox-link" href="/messages"{{if eq .Section "messages"}} aria-current="page"{{end}}>私信{{if .Me.Unread}} <b class="badge bad">{{.Me.Unread}}</b>{{end}}</a>
     <details class="account-menu">
       <summary><span class="pt-{{.Me.Color}}">{{.Me.Name}}</span><span class="chevron" aria-hidden="true"></span>{{if .Me.Tickets}}<b class="badge bad">{{.Me.Tickets}}</b>{{end}}</summary>

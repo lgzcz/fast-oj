@@ -155,6 +155,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /messages", s.handleInbox)
 	mux.HandleFunc("GET /messages/{handle}", s.handleThread)
 	mux.HandleFunc("POST /messages/{handle}", s.handleSend)
+	// 站内通知：谁回复了我的帖子、谁在正文里 @ 了我。
+	mux.HandleFunc("GET /notifications", s.handleNotifications)
+	mux.HandleFunc("POST /notifications/read", s.handleNotificationsRead)
 	mux.HandleFunc("POST /settings/privacy", s.handlePrivacy)
 	mux.HandleFunc("POST /checkin", s.handleCheckIn)
 
@@ -312,6 +315,7 @@ func (s *Server) handleAbout(w http.ResponseWriter, r *http.Request) {
 		"  GET  /u/{handle}/following    关注列表；/followers 粉丝",
 		"  POST /u/{handle}/follow       关注；/unfollow 取消",
 		"  GET  /messages                私信收件箱；/messages/{handle} 一对一对话",
+		"  GET  /notifications           站内通知：回复我的帖子、在帖子/动态里 @ 我的人；POST /notifications/read 全部标为已读",
 		"  POST /messages/{handle}       发一条私信（受收信策略限制）",
 		"  GET  /login /register         登录 / 注册",
 		"  GET  /forgot                  忘记密码：填邮箱，收一条 30 分钟一次性的重置链接（发信要配 SMTP）",
