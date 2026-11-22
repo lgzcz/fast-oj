@@ -1,0 +1,33 @@
+{{define "content"}}
+<h1>团队</h1>
+<p class="meta">团队是站内长期组织；比赛里的队伍是赛内的，两者互不影响。{{if .Data.SignedIn}}<a href="/teams/new">新建团队</a>{{end}}</p>
+
+<form class="row" method="get" action="/teams">
+  <div style="flex:1 1 18rem">
+    <label for="team-search">搜索团队</label>
+    <input id="team-search" type="search" name="q" value="{{.Data.Query}}" placeholder="团队名或简介里的词">
+  </div>
+  <input type="submit" value="搜索">
+</form>
+
+<div class="table-scroll" role="region" aria-label="团队列表" tabindex="0">
+<table>
+  <tr><th>团队</th><th>队长</th><th class="num">成员</th><th class="num">题库</th></tr>
+  {{range .Data.Rows}}
+  <tr>
+    <td><a href="/teams/{{.ID}}">{{.Name}}</a>
+      {{if .Mine}}<span class="badge">{{if eq .MyRole "captain"}}我建的{{else}}已加入{{end}}</span>{{end}}
+      {{if .Intro}}<div class="meta">{{.Intro}}</div>{{end}}
+    </td>
+    <td>{{if .OwnerHandle}}<a href="/u/{{.OwnerHandle}}">{{.Owner}}</a>{{else}}{{.Owner}}{{end}}</td>
+    <td class="num">{{.Members}}</td>
+    <td class="num">{{.Problems}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="4">还没有团队。登录后可以自己建一个。</td></tr>
+  {{end}}
+</table>
+</div>
+
+{{if .Data.Next}}<p class="meta"><a href="/teams?after={{.Data.Next}}&limit={{.Data.Limit}}{{with .Data.Query}}&q={{.}}{{end}}">下一页 →</a></p>{{end}}
+{{end}}

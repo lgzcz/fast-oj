@@ -30,6 +30,14 @@
 | `GET` `/POST` | `/trainings/{id}/edit` `/trainings/{id}` | 作者或 `problem.edit.any` | 改题单；删题单走 `POST /trainings/{id}/delete` |
 | `POST` | `/trainings/{id}/problems` | 同上 | 按题目编号加题；未公开的题只有它的作者能放进来 |
 | `POST` | `/trainings/{id}/problems/{problemKey}/remove` | 同上 | 把题移出题单（题目与提交不受影响） |
+| `GET` | `/teams` | 公开 | 团队列表，`?q=` `?after=` `?limit=` |
+| `GET` `/POST` | `/teams/new` `/teams` | 登录用户 | 建团队（名字站内唯一、可设加入码、最多 5 个） |
+| `GET` | `/teams/{id}` | 公开 | 团队简介、队长与成员；团队题库只对队员显示 |
+| `GET` `/POST` | `/teams/{id}/edit` `/teams/{id}` | 队长 | 改团队；`POST /teams/{id}/delete` 删团队（成员关系与题库一起没） |
+| `POST` | `/teams/{id}/join` `/leave` | 登录用户 / 队员 | 凭加入码加入 / 退出（队长不能退出） |
+| `POST` | `/teams/{id}/members/{handle}/remove` | 队长 | 把队员移出 |
+| `POST` | `/teams/{id}/problems` | 队员 | 往团队题库加题；未公开题只有作者能加 |
+| `POST` | `/teams/{id}/problems/{problemKey}/remove` | 队长 | 从团队题库移出 |
 | `GET` | `/submissions` | 公开 | 列表，`?user=`（或 `me`）`&problem=&status=&limit=&after=`；`status` 是管理员找"卡住的提交"的入口（`queued\|compiling\|running\|done\|abandoned`） |
 | `GET` | `/submissions/{id}` | 公开 | 结果。判机每完成一个用例就回报一行，未判完时页面每 2 秒自动刷新，逐用例行一条条冒出来 |
 | `POST` | `/submissions/{id}/rejudge` | `submission.rejudge` | 重新判题：退回队列，清掉上一次的判定、得分与逐用例（见[重判](judge-isolation.md#重判旧提交不会因为判机升级自己改判)） |

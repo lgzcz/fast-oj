@@ -159,6 +159,20 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /trainings/{id}/problems", s.handleTrainingProblemAdd)
 	mux.HandleFunc("POST /trainings/{id}/problems/{problemKey}/remove", s.handleTrainingProblemRemove)
 
+	// 团队：公开信息谁都能看，团队题库与成员管理按队内身份判定。
+	mux.HandleFunc("GET /teams", s.handleTeamList)
+	mux.HandleFunc("GET /teams/new", s.handleTeamNew)
+	mux.HandleFunc("POST /teams", s.handleTeamCreate)
+	mux.HandleFunc("GET /teams/{id}", s.handleTeamGet)
+	mux.HandleFunc("GET /teams/{id}/edit", s.handleTeamEdit)
+	mux.HandleFunc("POST /teams/{id}", s.handleTeamUpdate)
+	mux.HandleFunc("POST /teams/{id}/delete", s.handleTeamDelete)
+	mux.HandleFunc("POST /teams/{id}/join", s.handleTeamJoin)
+	mux.HandleFunc("POST /teams/{id}/leave", s.handleTeamLeave)
+	mux.HandleFunc("POST /teams/{id}/members/{handle}/remove", s.handleTeamMemberRemove)
+	mux.HandleFunc("POST /teams/{id}/problems", s.handleTeamProblemAdd)
+	mux.HandleFunc("POST /teams/{id}/problems/{problemKey}/remove", s.handleTeamProblemRemove)
+
 	mux.HandleFunc("GET /topics", s.handleTopicList)
 	mux.HandleFunc("GET /topics/new", s.handleTopicNew)
 	mux.HandleFunc("POST /topics", s.handleTopicCreate)
