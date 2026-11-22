@@ -253,8 +253,14 @@ func (db *DB) CreateSession(ctx context.Context, userID int64, ip, userAgent str
 	return Session{ID: id, UserID: userID, CSRF: csrf, ExpiresAt: expiry}, nil
 }
 
+// sessionSeenEvery bounds how often a session's last_seen_at is rewritten. Every
+// authenticated request used to be a read plus a write; a page polling every two
+// seconds turned that into a steady write load on SQLite. The stamp is not part of
+// any security decision (expiry is expires_at), so a minute of skew costs nothing.
+const sessionSeenEvery = time.Minute
+
 // SessionUser resolves a session id to its owner, refusing expired sessions and
-// disabled accounts, and refreshes the last-seen stamp.
+// disabled accounts. The last-seen stamp is refreshed at most once a minute.
 func (db *DB) SessionUser(ctx context.Context, id string) (User, Session, error) {
 	var (
 		u        User
@@ -278,7 +284,10 @@ func (db *DB) SessionUser(ctx context.Context, id string) (User, Session, error)
 	if err != nil {
 		return User{}, Session{}, err
 	}
-	if _, err := db.SQL.ExecContext(ctx, `UPDATE sessions SET last_seen_at=? WHERE id=?`, nowMS(), id); err != nil {
+	now := nowMS()
+	if _, err := db.SQL.ExecContext(ctx,
+		`UPDATE sessions SET last_seen_at=? WHERE id=? AND last_seen_at < ?`,
+		now, id, now-sessionSeenEvery.Milliseconds()); err != nil {
 		return User{}, Session{}, err
 	}
 	return u, Session{ID: id, UserID: userID, CSRF: csrf, ExpiresAt: expires, StepUpAt: stepUpAt}, nil

@@ -174,6 +174,70 @@ func TestSessionLifecycle(t *testing.T) {
 	}
 }
 
+// 读路径不能变成写路径：同一会话连续认证时不重复刷新 last_seen_at，超过一分钟才写。
+func TestSessionLastSeenIsThrottled(t *testing.T) {
+	ctx := context.Background()
+	db := openTestDB(t)
+	u, err := db.CreateAccount(ctx, AccountInput{
+		Handle: "seen", Email: "seen@example.com", Password: "correct-horse-battery", Cost: 4,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess, err := db.CreateSession(ctx, u.ID, "10.0.0.1", "ua", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := func() int64 {
+		t.Helper()
+		var at int64
+		if err := db.SQL.QueryRowContext(ctx,
+			`SELECT last_seen_at FROM sessions WHERE id=?`, sess.ID).Scan(&at); err != nil {
+			t.Fatal(err)
+		}
+		return at
+	}
+
+	start := seen()
+	if _, _, err := db.SessionUser(ctx, sess.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := seen(); got != start {
+		t.Fatalf("刚建好的会话被重复刷新：%d -> %d", start, got)
+	}
+
+	inside := nowMS() - 30_000
+	if _, err := db.SQL.ExecContext(ctx,
+		`UPDATE sessions SET last_seen_at=? WHERE id=?`, inside, sess.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := db.SessionUser(ctx, sess.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := seen(); got != inside {
+		t.Fatalf("窗口内仍写了 last_seen_at：%d", got)
+	}
+
+	old := nowMS() - 2*time.Minute.Milliseconds()
+	if _, err := db.SQL.ExecContext(ctx,
+		`UPDATE sessions SET last_seen_at=? WHERE id=?`, old, sess.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := db.SessionUser(ctx, sess.ID); err != nil {
+		t.Fatal(err)
+	}
+	fresh := seen()
+	if fresh <= old {
+		t.Fatalf("过期 stamp 没刷新：%d", fresh)
+	}
+	if _, _, err := db.SessionUser(ctx, sess.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := seen(); got != fresh {
+		t.Fatalf("紧接着的第二次请求又写了：%d -> %d", fresh, got)
+	}
+}
+
 func TestDisabledAccountCannotUseSessionOrLogin(t *testing.T) {
 	ctx := context.Background()
 	db := openTestDB(t)
