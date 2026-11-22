@@ -1,0 +1,34 @@
+{{define "content"}}
+<h1>题单</h1>
+<p class="meta">题单是按学习顺序排好的一串题，不是比赛：没有计时，也不进榜单。{{if .Data.SignedIn}}<a href="/trainings/new">新建题单</a>{{end}}</p>
+
+<form class="row" method="get" action="/trainings">
+  <div style="flex:1 1 18rem">
+    <label for="training-search">搜索题单</label>
+    <input id="training-search" type="search" name="q" placeholder="标题或说明里的词" value="{{.Data.Query}}">
+  </div>
+  <input type="submit" value="搜索">
+</form>
+
+<div class="table-scroll" role="region" aria-label="题单列表" tabindex="0">
+<table>
+  <tr><th>标题</th><th>作者</th><th class="num">题数</th><th>创建</th></tr>
+  {{range .Data.Rows}}
+  <tr>
+    <td><a href="/trainings/{{.ID}}">{{.Title}}</a>
+      {{if not .Visible}}<span class="hidden">未公开</span>{{end}}
+      {{if .Mine}}<span class="badge">我的</span>{{end}}
+      {{if .Intro}}<div class="meta">{{.Intro}}</div>{{end}}
+    </td>
+    <td>{{if .OwnerHandle}}<a href="/u/{{.OwnerHandle}}">{{.Owner}}</a>{{else}}{{.Owner}}{{end}}</td>
+    <td class="num">{{.Problems}}</td>
+    <td>{{.When}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="4">还没有题单。登录后可以自己建一个。</td></tr>
+  {{end}}
+</table>
+</div>
+
+{{if .Data.Next}}<p class="meta"><a href="/trainings?after={{.Data.Next}}&limit={{.Data.Limit}}{{with .Data.Query}}&q={{.}}{{end}}">下一页 →</a></p>{{end}}
+{{end}}

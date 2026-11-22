@@ -24,6 +24,12 @@
 | `POST` | `/problems/{key}/attachments` | 该题 owner 或 `problem.edit.any` | 传附件（PDF / 图片 / zip / 文本，单文件 ≤ 16MB，每题 20 个） |
 | `POST` | `/problems/{key}/attachments/{id}/delete` | 同上 | 删一个附件（连带落盘文件） |
 | `POST` | `/problems/{key}/submit` | 登录用户 | 网页表单提交 |
+| `GET` | `/trainings` | 公开 | 题单列表，`?q=` `?after=` `?limit=`；未公开题单只对作者与 `problem.edit.any` 出现 |
+| `GET` `/POST` | `/trainings/new` `/trainings` | 登录用户 | 建题单（标题、说明、是否公开） |
+| `GET` | `/trainings/{id}` | 公开（未公开题单限作者） | 题单正文与题目表；登录后显示每题 AC 状态与完成度 |
+| `GET` `/POST` | `/trainings/{id}/edit` `/trainings/{id}` | 作者或 `problem.edit.any` | 改题单；删题单走 `POST /trainings/{id}/delete` |
+| `POST` | `/trainings/{id}/problems` | 同上 | 按题目编号加题；未公开的题只有它的作者能放进来 |
+| `POST` | `/trainings/{id}/problems/{problemKey}/remove` | 同上 | 把题移出题单（题目与提交不受影响） |
 | `GET` | `/submissions` | 公开 | 列表，`?user=`（或 `me`）`&problem=&status=&limit=&after=`；`status` 是管理员找"卡住的提交"的入口（`queued\|compiling\|running\|done\|abandoned`） |
 | `GET` | `/submissions/{id}` | 公开 | 结果。判机每完成一个用例就回报一行，未判完时页面每 2 秒自动刷新，逐用例行一条条冒出来 |
 | `POST` | `/submissions/{id}/rejudge` | `submission.rejudge` | 重新判题：退回队列，清掉上一次的判定、得分与逐用例（见[重判](judge-isolation.md#重判旧提交不会因为判机升级自己改判)） |

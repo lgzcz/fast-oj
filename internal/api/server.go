@@ -100,6 +100,17 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /problems/{key}/cases/{name}/{which}", s.handleCaseBody)
 	mux.HandleFunc("GET /problems/{key}/topics", s.handleProblemTopics)
 
+	// 题单：登录用户都能建，作者（或 problem.edit.any）维护其中的题。
+	mux.HandleFunc("GET /trainings", s.handleTrainingList)
+	mux.HandleFunc("GET /trainings/new", s.handleTrainingNew)
+	mux.HandleFunc("POST /trainings", s.handleTrainingCreate)
+	mux.HandleFunc("GET /trainings/{id}", s.handleTrainingGet)
+	mux.HandleFunc("GET /trainings/{id}/edit", s.handleTrainingEdit)
+	mux.HandleFunc("POST /trainings/{id}", s.handleTrainingUpdate)
+	mux.HandleFunc("POST /trainings/{id}/delete", s.handleTrainingDelete)
+	mux.HandleFunc("POST /trainings/{id}/problems", s.handleTrainingProblemAdd)
+	mux.HandleFunc("POST /trainings/{id}/problems/{problemKey}/remove", s.handleTrainingProblemRemove)
+
 	mux.HandleFunc("GET /topics", s.handleTopicList)
 	mux.HandleFunc("GET /topics/new", s.handleTopicNew)
 	mux.HandleFunc("POST /topics", s.handleTopicCreate)

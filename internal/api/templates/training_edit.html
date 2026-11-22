@@ -1,0 +1,39 @@
+{{define "content"}}
+<h1>{{if .Data.IsNew}}新建题单{{else}}编辑题单{{end}}</h1>
+<p class="meta">说明走与题面同一套 Markdown + <code>$KaTeX$</code>。</p>
+
+{{if .Data.Errors}}
+<div class="flash">
+  {{range .Data.Errors}}<p>{{.}}</p>{{end}}
+</div>
+{{end}}
+
+<form method="post" action="{{.Data.Action}}">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+
+  <label>标题</label>
+  <input type="text" name="title" value="{{.Data.Title}}" maxlength="100" required>
+
+  <label class="check">
+    <input type="checkbox" name="visible" value="1" {{if .Data.Visible}}checked{{end}}>
+    出现在题单列表（不勾只有你自己和持 <code>problem.edit.any</code> 的人看得到）
+  </label>
+
+  <label>说明</label>
+  <textarea name="intro" rows="12" maxlength="20000" spellcheck="false"
+            placeholder="这份题单适合谁、按什么顺序做、做完能学到什么……">{{.Data.Intro}}</textarea>
+
+  <p class="row">
+    <input type="submit" value="{{if .Data.IsNew}}创建并去加题{{else}}保存{{end}}">
+    {{if not .Data.IsNew}}<a href="/trainings/{{.Data.ID}}">回到题单</a>{{end}}
+  </p>
+</form>
+
+{{if not .Data.IsNew}}
+<form method="post" action="/trainings/{{.Data.ID}}/delete"
+      onsubmit="return confirm('删掉这个题单？题单本身和它的题目顺序会一起没掉，题目与提交不受影响。')">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <button type="submit" class="danger">删除题单</button>
+</form>
+{{end}}
+{{end}}

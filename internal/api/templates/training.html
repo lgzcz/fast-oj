@@ -1,0 +1,60 @@
+{{define "content"}}
+<h1>{{.Data.Title}}</h1>
+
+<p class="meta">
+  {{if .Data.Visible}}公开题单{{else}}<span class="hidden">未公开</span>{{end}}
+  · 作者 {{if .Data.OwnerHandle}}<a href="/u/{{.Data.OwnerHandle}}">{{.Data.Owner}}</a>{{else}}{{.Data.Owner}}{{end}}
+  · {{.Data.When}} · 共 {{len .Data.Problems}} 题
+  {{if .Data.CanManage}} · <a href="/trainings/{{.Data.ID}}/edit">编辑</a>{{end}}
+</p>
+
+{{if .Data.Intro}}<article class="post-body">{{markdown .Data.Intro}}</article>{{end}}
+
+{{if .Data.SignedIn}}
+<p class="meta">已通过 {{.Data.Solved}} / {{len .Data.Problems}} 题
+  {{if .Data.Problems}}（{{.Data.Progress}}%）{{end}}</p>
+{{end}}
+
+<div class="table-scroll" role="region" aria-label="题单内容" tabindex="0">
+<table>
+  <tr><th class="num">#</th><th>题目</th><th>难度</th><th>标签</th><th>状态</th>{{if .Data.CanManage}}<th>管理</th>{{end}}</tr>
+  {{range .Data.Problems}}
+  <tr>
+    <td class="num">{{.Position}}</td>
+    <td><a href="/problems/{{.PID}}">{{.PID}}</a>　{{.Title}}{{if .Hidden}} <span class="hidden">未公开</span>{{end}}</td>
+    <td>{{.Difficulty}}</td>
+    <td>{{range .Tags}}<span class="badge">{{.}}</span> {{end}}</td>
+    <td>{{if .Solved}}<span class="status status-solved">AC</span>{{else}}<span class="status status-untried">未做</span>{{end}}</td>
+    {{if $.Data.CanManage}}
+    <td>
+      <form class="inline" method="post" action="/trainings/{{$.Data.ID}}/problems/{{.PID}}/remove">
+        <input type="hidden" name="csrf" value="{{$.Me.CSRF}}">
+        <button type="submit">移出</button>
+      </form>
+    </td>
+    {{end}}
+  </tr>
+  {{else}}
+  <tr><td colspan="{{if $.Data.CanManage}}6{{else}}5{{end}}">这个题单还是空的。</td></tr>
+  {{end}}
+</table>
+</div>
+
+{{if .Data.CanManage}}
+<h2>加题</h2>
+<form class="row" method="post" action="/trainings/{{.Data.ID}}/problems">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <div style="flex:1 1 18rem">
+    <label>题目编号（如 P1001）</label>
+    <input type="text" name="problem" maxlength="32" autocomplete="off" spellcheck="false" required>
+  </div>
+  <div>
+    <label>&nbsp;</label>
+    <input type="submit" value="加进题单">
+  </div>
+</form>
+<p class="meta">未公开的题只有它的作者能放进题单；别人打开题单时看不到这一行。</p>
+{{end}}
+
+<p class="meta"><a href="/trainings">所有题单 →</a></p>
+{{end}}
