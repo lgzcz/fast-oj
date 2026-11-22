@@ -67,6 +67,10 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
 	mux.HandleFunc("GET /about", s.handleAbout)
+	// 不登录也要能读的两页，加上给搜索引擎的公开内容清单。
+	mux.HandleFunc("GET /docs", s.handleSiteDocs)
+	mux.HandleFunc("GET /updates", s.handleUpdates)
+	mux.HandleFunc("GET /sitemap.xml", s.handleSitemap)
 
 	mux.HandleFunc("GET /problems", s.handleProblemList)
 	mux.HandleFunc("GET /problems/new", s.handleProblemNew)
@@ -332,6 +336,9 @@ func (s *Server) handleAbout(w http.ResponseWriter, r *http.Request) {
 		"  GET  /admin/accounts/new      批量建号表单（user.manage）",
 		"  POST /admin/accounts          一次建一批：名单模式或前缀+个数模式，初始密码只在这页出现一次",
 		"  GET  /judges                  判机框列表（judge.view）",
+		"  GET  /docs                    使用说明（公开）",
+		"  GET  /updates                 更新日志（公开）",
+		"  GET  /sitemap.xml             公开题目与比赛的站点地图",
 		"  GET  /healthz                 探活",
 		"",
 		"  判机内部协议（只有判机令牌能用，网页上没有入口）：",
