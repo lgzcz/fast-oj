@@ -120,6 +120,7 @@ curl -s localhost:8080/healthz          # ok
 | [Python 提交：护栏装在解释器里，边界还是牢房](docs/python.md) | Python 提交：解释器护栏与牢房边界 |
 | [比赛（限时 + 独立榜 + 加入码 + 队伍，OI/IOI/ACM 三种赛制）](docs/contests.md) | 比赛：限时、独立榜、加入码、队伍、OI/IOI/ACM 三赛制 |
 | [帖子（求助贴 / 社区贴 + 评论）](docs/topics.md) | 帖子：求助贴 / 社区贴 + 评论 |
+| [群聊、剪贴板与帖子投票](docs/community.md) | 群聊：纯文本房间；剪贴板：私人记事本；投票：一人一票可改 |
 | [工单（用户提单，管理员处理）](docs/tickets.md) | 工单：用户提单、管理员处理 |
 | [身份与权限](docs/permissions.md) | 身份与权限：细粒度能力位、身份再确认、一次性运维令牌、超级管理员 |
 | [注销账号（不是封禁，也不是删除）](docs/account-deletion.md) | 注销账号（不是封禁，也不是删除） |

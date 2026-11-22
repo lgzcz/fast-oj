@@ -48,6 +48,19 @@
   <textarea name="body" rows="14" maxlength="16000" spellcheck="false" autocomplete="off"
             placeholder="哪里不对、你试了什么、想要什么帮助">{{.Data.Body}}</textarea>
 
+  <details class="meta">
+    <summary>加一个投票（可选）</summary>
+    <div class="row">
+      <div style="flex:1 1 22rem">
+        <label>问题</label>
+        <input type="text" name="poll_question" maxlength="200" value="{{.Data.PollQuestion}}">
+      </div>
+    </div>
+    <label>选项（每行一个，2..8 个）</label>
+    <textarea name="poll_options" rows="4" spellcheck="false" autocomplete="off"
+              placeholder="选项一&#10;选项二">{{.Data.PollOptions}}</textarea>
+  </details>
+
   <p class="row">
     <input type="submit" value="发布">
     <button type="submit" name="preview" value="1">预览</button>

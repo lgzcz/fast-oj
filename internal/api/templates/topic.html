@@ -9,6 +9,28 @@
 
 <article class="post-body">{{.Data.Body}}</article>
 
+{{with .Data.Poll}}
+<section class="poll" aria-label="投票">
+  <h2>{{.Question}}</h2>
+  <form method="post" action="/topics/{{$.Data.ID}}/vote">
+    {{if $.Me}}<input type="hidden" name="csrf" value="{{$.Me.CSRF}}">{{end}}
+    {{range $i, $o := .Options}}
+    <div class="poll-option">
+      <label class="check">
+        <input type="radio" name="option" value="{{$i}}" {{if eq $i $.Data.Poll.MyVote}}checked{{end}} {{if not $.Data.Poll.CanVote}}disabled{{end}}>
+        {{$o.Text}}
+      </label>
+      <div class="bar"><span style="width:{{$o.Percent}}%"></span></div>
+      <span class="meta">{{$o.Count}} 票 · {{$o.Percent}}%</span>
+    </div>
+    {{end}}
+    {{if .CanVote}}<p><input type="submit" value="{{if .Voted}}改投{{else}}投票{{end}}"></p>
+    {{else}}<p class="meta"><a href="/login?next=/topics/{{$.Data.ID}}">登录</a> 后才能投票。</p>{{end}}
+  </form>
+  <p class="meta">共 {{.Total}} 票{{if .Voted}} · 你已投票{{end}} · 一人一票，可以改</p>
+</section>
+{{end}}
+
 {{if .Me}}
 <details class="meta">
   <summary>举报这个帖子</summary>

@@ -1,0 +1,49 @@
+{{define "content"}}
+<h1>剪贴板</h1>
+<p class="meta">自己的临时记事本，只有你能看到；最多 {{.Data.Max}} 条，纯文本不渲染。</p>
+
+{{if .Data.Errors}}
+<div class="flash">
+  {{range .Data.Errors}}<p>{{.}}</p>{{end}}
+</div>
+{{end}}
+
+<h2>新建</h2>
+<form method="post" action="/clipboard">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <div class="row">
+    <div style="flex:1 1 20rem">
+      <label>名字</label>
+      <input type="text" name="name" maxlength="60" value="{{.Data.Name}}" required>
+    </div>
+  </div>
+  <label>内容</label>
+  <textarea name="body" rows="5" maxlength="65536"></textarea>
+  <p><input type="submit" value="保存"></p>
+</form>
+
+<h2>我的条目</h2>
+{{range .Data.Rows}}
+<section class="clipboard-item">
+  <form method="post" action="/clipboard/{{.ID}}">
+    <input type="hidden" name="csrf" value="{{$.Me.CSRF}}">
+    <div class="row">
+      <div style="flex:1 1 20rem">
+        <label>名字</label>
+        <input type="text" name="name" maxlength="60" value="{{.Name}}" required>
+      </div>
+      <div><label>&nbsp;</label><input type="submit" value="保存修改"></div>
+    </div>
+    <label>内容 · {{.When}}</label>
+    <textarea name="body" rows="5" maxlength="65536">{{.Body}}</textarea>
+  </form>
+  <form class="inline" method="post" action="/clipboard/{{.ID}}/delete"
+        onsubmit="return confirm('删掉这条剪贴板？')">
+    <input type="hidden" name="csrf" value="{{$.Me.CSRF}}">
+    <button type="submit" class="danger">删除</button>
+  </form>
+</section>
+{{else}}
+<p class="meta">还是空的。</p>
+{{end}}
+{{end}}

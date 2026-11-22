@@ -388,3 +388,13 @@ body[data-page=settings] main > form > label:first-of-type { margin-top: 0; }
 .profile-cover { height: 12rem; border: 1px solid var(--line); border-radius: var(--radius); background-size: cover; background-position: center; margin: .25rem 0 1rem; }
 .profile-cover-small { height: 6rem; margin-top: .5rem; }
 .avatar { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); margin: .25rem 0 .5rem; }
+
+.chat-log { display: flex; flex-direction: column; gap: .75rem; margin: 1rem 0; }
+.chat-msg .body { white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-msg header { margin-bottom: .25rem; }
+.clipboard-item { border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem; margin: 1rem 0; background: var(--surface); }
+.poll { border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem; margin: 1.25rem 0; background: var(--surface); }
+.poll h2 { margin-top: 0; }
+.poll-option { margin: .6rem 0; }
+.poll .bar { height: .5rem; background: var(--code); border-radius: 3px; overflow: hidden; margin: .3rem 0 .2rem; }
+.poll .bar span { display: block; height: 100%; background: var(--accent); }

@@ -172,6 +172,8 @@ type topicForm struct {
 	Kind, Title, Body string
 	ProblemKey        string
 	ProblemID         int64
+	PollQuestion      string
+	PollOptions       string
 	Errors            []string
 }
 
@@ -179,10 +181,12 @@ type topicForm struct {
 // can be redrawn with what was typed.
 func (s *Server) parseTopicForm(r *http.Request, a actor) topicForm {
 	f := topicForm{
-		Kind:       r.FormValue("kind"),
-		Title:      strings.TrimSpace(r.FormValue("title")),
-		Body:       r.FormValue("body"),
-		ProblemKey: strings.TrimSpace(r.FormValue("problem")),
+		Kind:         r.FormValue("kind"),
+		Title:        strings.TrimSpace(r.FormValue("title")),
+		Body:         r.FormValue("body"),
+		ProblemKey:   strings.TrimSpace(r.FormValue("problem")),
+		PollQuestion: strings.TrimSpace(r.FormValue("poll_question")),
+		PollOptions:  r.FormValue("poll_options"),
 	}
 	if !store.ValidTopicKind(f.Kind) {
 		f.Errors = append(f.Errors, "帖子类型只认求助或社区")
@@ -194,6 +198,9 @@ func (s *Server) parseTopicForm(r *http.Request, a actor) topicForm {
 	}
 	if tooLong(f.Body, store.MaxTopicBody) {
 		f.Errors = append(f.Errors, fmt.Sprintf("正文最长 %d 个字符", store.MaxTopicBody))
+	}
+	if err := store.ValidatePoll(f.PollQuestion, f.PollOptions); err != nil {
+		f.Errors = append(f.Errors, err.Error())
 	}
 	if f.Kind == store.TopicHelp {
 		if f.ProblemKey == "" {
@@ -216,6 +223,7 @@ func (s *Server) parseTopicForm(r *http.Request, a actor) topicForm {
 // topicFormData is the payload of the post form.
 type topicFormData struct {
 	Kind, Title, Body, Problem string
+	PollQuestion, PollOptions  string
 	Problems                   []bankEntry
 	Errors                     []string
 	Preview                    template.HTML
@@ -239,6 +247,7 @@ func newTopicFormData(p store.Problem, locked bool) topicFormData {
 
 func (d *topicFormData) fillFromForm(f topicForm) {
 	d.Kind, d.Title, d.Body, d.Problem = f.Kind, f.Title, f.Body, f.ProblemKey
+	d.PollQuestion, d.PollOptions = f.PollQuestion, f.PollOptions
 	d.Errors = append(d.Errors, f.Errors...)
 }
 
@@ -298,7 +307,10 @@ func (s *Server) handleTopicCreate(w http.ResponseWriter, r *http.Request) {
 	f := s.parseTopicForm(r, a)
 	// The form is redrawn from what was posted, so an unresolvable problem key stays
 	// on the page as the error parseTopicForm reported instead of failing here.
-	d := topicFormData{Action: "/topics", Kind: f.Kind, LockedProblem: r.FormValue("locked") == "1"}
+	d := topicFormData{
+		Action: "/topics", Kind: f.Kind, LockedProblem: r.FormValue("locked") == "1",
+		PollQuestion: f.PollQuestion, PollOptions: f.PollOptions,
+	}
 	bank, err := s.db.ListProblems(r.Context(), store.ProblemCursor{}, 500, "", !a.can(permProblemEditAny), store.ProblemSortPID)
 	if err != nil {
 		s.writeStoreError(w, r, err)
@@ -337,11 +349,57 @@ func (s *Server) handleTopicCreate(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.db.RegisterLoginFailure(r.Context(), key, topicWindow); err != nil {
 		s.log.Error("topic counter", "err", err)
 	}
+	// 投票字段在 parseTopicForm 里已经校验过；真写失败也不该把已经发出去的帖子
+	// 变成错误页——帖子是主体，投票只是附件。
+	pollNote := ""
+	if f.PollQuestion != "" {
+		if err := s.db.CreatePoll(r.Context(), topic.ID, f.PollQuestion, f.PollOptions); err != nil {
+			s.log.Error("poll create", "topic", topic.ID, "err", err)
+			pollNote = "帖子已发布，但投票没有存上"
+		}
+	}
 	// @ 只在正文与标题里认；通知失败不该把已经发出去的帖子变成一张错误页。
 	s.notifyMentions(r.Context(), a, f.Title+"\n"+f.Body,
 		"/topics/"+strconv.FormatInt(topic.ID, 10), "帖子《"+topic.Title+"》", nil)
 	s.log.Info("topic created", "id", topic.ID, "kind", topic.Kind, "by", a.User.Handle)
-	http.Redirect(w, r, "/topics/"+strconv.FormatInt(topic.ID, 10)+"?msg="+url.QueryEscape("已发布"), http.StatusSeeOther)
+	msg := "已发布"
+	if pollNote != "" {
+		msg = pollNote
+	}
+	http.Redirect(w, r, "/topics/"+strconv.FormatInt(topic.ID, 10)+"?msg="+url.QueryEscape(msg), http.StatusSeeOther)
+}
+
+// pollView is the poll as the topic page draws it; percentages are computed once
+// here so the template stays free of arithmetic.
+type pollView struct {
+	Question string
+	Options  []pollOptionView
+	Total    int
+	MyVote   int
+	Voted    bool
+	CanVote  bool
+}
+
+type pollOptionView struct {
+	Text    string
+	Count   int
+	Percent int
+}
+
+func newPollView(p store.Poll, signedIn bool) *pollView {
+	v := &pollView{Question: p.Question, Total: p.Total, MyVote: p.MyVote, Voted: p.MyVote >= 0, CanVote: signedIn}
+	for i, text := range p.Options {
+		count := 0
+		if i < len(p.Votes) {
+			count = p.Votes[i]
+		}
+		percent := 0
+		if p.Total > 0 {
+			percent = count * 100 / p.Total
+		}
+		v.Options = append(v.Options, pollOptionView{Text: text, Count: count, Percent: percent})
+	}
+	return v
 }
 
 // topicData is one post with what a reader may do with it.
@@ -366,6 +424,7 @@ type topicData struct {
 	Comments   []commentRow
 	CommentNum int
 	SignedIn   bool
+	Poll       *pollView
 }
 
 func (s *Server) handleTopicGet(w http.ResponseWriter, r *http.Request) {
@@ -397,6 +456,14 @@ func (s *Server) handleTopicGet(w http.ResponseWriter, r *http.Request) {
 		d.BackLink = "/topics"
 		d.BackText = "全部社区贴"
 	}
+	poll, hasPoll, err := s.db.GetPoll(r.Context(), topic.ID, a.User.ID)
+	if err != nil {
+		s.writeStoreError(w, r, err)
+		return
+	}
+	if hasPoll {
+		d.Poll = newPollView(poll, a.User.ID != 0)
+	}
 	comments, err := s.db.ListTopicComments(r.Context(), topic.ID)
 	if err != nil {
 		s.writeStoreError(w, r, err)
@@ -406,6 +473,41 @@ func (s *Server) handleTopicGet(w http.ResponseWriter, r *http.Request) {
 	d.CommentNum = len(comments)
 	d.SignedIn = a.User.ID != 0
 	s.page(w, r, http.StatusOK, topic.Title, "topic", a.viewer(), msgOf(r), d)
+}
+
+func (s *Server) handlePollVote(w http.ResponseWriter, r *http.Request) {
+	a, topic, ok := s.topicByID(w, r)
+	if !ok {
+		return
+	}
+	back := "/topics/" + strconv.FormatInt(topic.ID, 10)
+	if a.User.ID == 0 {
+		http.Redirect(w, r, "/login?next="+url.QueryEscape(back), http.StatusSeeOther)
+		return
+	}
+	index, err := strconv.Atoi(r.FormValue("option"))
+	if err != nil {
+		s.respondError(w, r, http.StatusBadRequest, "要选一个选项")
+		return
+	}
+	poll, hasPoll, err := s.db.GetPoll(r.Context(), topic.ID, 0)
+	if err != nil {
+		s.writeStoreError(w, r, err)
+		return
+	}
+	if !hasPoll {
+		s.respondError(w, r, http.StatusNotFound, "这个帖子没有投票")
+		return
+	}
+	if index < 0 || index >= len(poll.Options) {
+		s.respondError(w, r, http.StatusBadRequest, "没有这个选项")
+		return
+	}
+	if err := s.db.VotePoll(r.Context(), topic.ID, a.User.ID, index); err != nil {
+		s.writeStoreError(w, r, err)
+		return
+	}
+	http.Redirect(w, r, back+"?msg="+url.QueryEscape("已投票，可随时改"), http.StatusSeeOther)
 }
 
 // topicByID resolves /topics/{id} for both the page and the comment form, so the two

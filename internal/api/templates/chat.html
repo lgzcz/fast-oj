@@ -1,0 +1,40 @@
+{{define "content"}}
+<h1>群聊</h1>
+<p class="meta">公共房间，谁都能读；登录后才能发言。消息只按纯文本显示，不渲染链接与 Markdown。</p>
+
+{{if .Data.Errors}}
+<div class="flash">
+  {{range .Data.Errors}}<p>{{.}}</p>{{end}}
+</div>
+{{end}}
+
+<div class="table-scroll" role="region" aria-label="房间列表" tabindex="0">
+<table>
+  <tr><th>房间</th><th class="num">消息</th><th>房主</th><th>创建</th></tr>
+  {{range .Data.Rows}}
+  <tr>
+    <td><a href="/chat/{{.ID}}">#{{.Name}}</a></td>
+    <td class="num">{{.Messages}}</td>
+    <td>{{if .OwnerHandle}}<a href="/u/{{.OwnerHandle}}">{{.Owner}}</a>{{else}}{{.Owner}}{{end}}</td>
+    <td>{{.When}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="4">还没有房间，开一个吧。</td></tr>
+  {{end}}
+</table>
+</div>
+
+{{if .Data.SignedIn}}
+<h2>开新房间</h2>
+<form method="post" action="/chat" class="row">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <div style="flex:1 1 18rem">
+    <label>房间名</label>
+    <input type="text" name="name" maxlength="60" value="{{.Data.Name}}" required>
+  </div>
+  <div><label>&nbsp;</label><input type="submit" value="开房"></div>
+</form>
+{{else}}
+<p class="meta"><a href="/login?next=/chat">登录</a> 后可以开房与发言。</p>
+{{end}}
+{{end}}

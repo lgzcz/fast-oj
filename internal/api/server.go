@@ -179,6 +179,20 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /topics/{id}", s.handleTopicGet)
 	mux.HandleFunc("POST /topics/{id}/delete", s.handleTopicDelete)
 	mux.HandleFunc("POST /topics/{id}/comment", s.handleTopicComment)
+	mux.HandleFunc("POST /topics/{id}/vote", s.handlePollVote)
+
+	// 群聊与剪贴板是社区扩展：群聊公开可读、登录才能发言；剪贴板只属于登录用户。
+	mux.HandleFunc("GET /chat", s.handleChatList)
+	mux.HandleFunc("POST /chat", s.handleChatCreate)
+	mux.HandleFunc("GET /chat/{id}", s.handleChatGet)
+	mux.HandleFunc("POST /chat/{id}", s.handleChatPost)
+	mux.HandleFunc("POST /chat/{id}/delete", s.handleChatRoomDelete)
+	mux.HandleFunc("POST /chat/messages/{id}/delete", s.handleChatMessageDelete)
+	mux.HandleFunc("GET /clipboard", s.handleClipboardList)
+	mux.HandleFunc("POST /clipboard", s.handleClipboardCreate)
+	mux.HandleFunc("POST /clipboard/{id}", s.handleClipboardUpdate)
+	mux.HandleFunc("POST /clipboard/{id}/delete", s.handleClipboardDelete)
+
 	mux.HandleFunc("GET /tickets", s.handleTicketList)
 	mux.HandleFunc("GET /tickets/new", s.handleTicketNew)
 	mux.HandleFunc("POST /tickets", s.handleTicketCreate)
@@ -419,7 +433,11 @@ func (s *Server) handleAbout(w http.ResponseWriter, r *http.Request) {
 		"  GET  /topics                  社区贴列表（?q= &after= &limit=）；/topics/new 发帖",
 		"  GET  /topics/{id}             帖子正文与评论；POST /topics/{id}/delete 删帖（本人或 topic.moderate）",
 		"  POST /topics/{id}/comment     发表评论（登录用户，一小时 60 条）",
+		"  POST /topics/{id}/vote        投票（登录用户，一人一票、可改）",
 		"  POST /topics/comments/{id}/delete  删评论（本人或 topic.moderate）",
+		"  GET  /chat                    群聊房间列表；POST /chat 开房（登录，一小时 5 个）",
+		"  GET  /chat/{id}               房间消息；POST /chat/{id} 发言（登录，一分钟 30 句）",
+		"  GET  /clipboard               个人剪贴板（登录）；POST 新建，POST /clipboard/{id} 保存，/delete 删除",
 		"  GET  /tickets                 工单列表：普通用户看自己的，持 ticket.handle 的看队列",
 		"  GET  /tickets/new             提交工单（申诉 / 故障建议 / 举报 / 账号 / 其他）",
 		"  GET  /tickets/{id}            工单详情与流水（只有作者与处理人读得到）",

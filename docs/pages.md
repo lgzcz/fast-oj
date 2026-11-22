@@ -67,6 +67,15 @@
 | `POST` | `/topics/{id}/comment` | 登录用户 | 发表评论（每人每小时 60 条） |
 | `POST` | `/topics/{id}/delete` | 本人或 `topic.moderate` | 删帖（评论一起没） |
 | `POST` | `/topics/comments/{id}/delete` | 本人或 `topic.moderate` | 删一条评论 |
+| `POST` | `/topics/{id}/vote` | 登录用户 | 帖子投票：一人一票，可改投 |
+| `GET` `/POST` | `/chat` | 公开读 / 登录开房 | 群聊房间列表与开房（每房间名 ≤60 字；全站 ≤100 间） |
+| `GET` | `/chat/{id}` | 公开 | 房间消息（纯文本，最新在底部） |
+| `POST` | `/chat/{id}` | 登录用户 | 发言（每人每分钟 30 句） |
+| `POST` | `/chat/{id}/delete` | 房主或 `topic.moderate` | 删房间（消息级联删除） |
+| `POST` | `/chat/messages/{id}/delete` | 作者或 `topic.moderate` | 删一句 |
+| `GET` `/POST` | `/clipboard` | 登录用户 | 个人剪贴板：列表与新建 |
+| `POST` | `/clipboard/{id}` | 条目所有者 | 保存修改（别人一律 404） |
+| `POST` | `/clipboard/{id}/delete` | 条目所有者 | 删除条目 |
 | `GET` | `/tickets` | 登录用户 | 工单列表：`?scope=mine\|queue\|all` `?status=` `?q=` `?after=`（后两种要 `ticket.handle`） |
 | `GET` `/POST` | `/tickets/new` `/tickets` | 登录用户 | 提交工单（申诉 / 故障建议 / 举报 / 账号 / 其他），可挂题目或提交 |
 | `GET` | `/tickets/{id}` | 作者或 `ticket.handle` | 工单详情与流水；**陌生人拿到 404**，不确认存在 |

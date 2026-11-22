@@ -1,0 +1,61 @@
+{{define "content"}}
+<h1>#{{.Data.Name}}</h1>
+<p class="meta">
+  {{if .Data.OwnerHandle}}房主 <a href="/u/{{.Data.OwnerHandle}}">{{.Data.Owner}}</a>{{else}}房主 {{.Data.Owner}}{{end}}
+  · 最新的在底部 · 每 20 秒自动刷新
+</p>
+
+<div class="chat-log">
+  {{range .Data.Messages}}
+  <article class="reply chat-msg" id="m{{.ID}}">
+    <header>
+      {{if .Handle}}<a class="who pt-{{.Color}}" href="/u/{{.Handle}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}
+      <span class="when">{{.When}}</span>
+      {{if .CanDelete}}
+      <form class="inline ops" method="post" action="/chat/messages/{{.ID}}/delete"
+            onsubmit="return confirm('删掉这句？')">
+        <input type="hidden" name="csrf" value="{{$.Me.CSRF}}">
+        <button type="submit">删除</button>
+      </form>
+      {{end}}
+    </header>
+    <div class="body">{{.Body}}</div>
+  </article>
+  {{else}}
+  <p class="meta">还没有人说话。</p>
+  {{end}}
+</div>
+
+{{if .Data.SignedIn}}
+<form method="post" action="/chat/{{.Data.ID}}" class="composer">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <label>发言（纯文本，最多 {{.Data.MaxBody}} 字）</label>
+  <textarea name="body" rows="3" maxlength="{{.Data.MaxBody}}" required placeholder="说点什么"></textarea>
+  <p><input type="submit" value="发送"></p>
+</form>
+{{else}}
+<p class="meta"><a href="/login?next=/chat/{{.Data.ID}}">登录</a> 后才能发言，未登录可以浏览。</p>
+{{end}}
+
+<p class="meta">
+  <a href="/chat">所有房间 →</a>
+  {{if .Data.CanDelete}}
+  <form class="inline" method="post" action="/chat/{{.Data.ID}}/delete"
+        onsubmit="return confirm('删掉整个房间？里面的消息会一起没掉。')">
+    <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+    <button type="submit" class="danger">删除房间</button>
+  </form>
+  {{end}}
+</p>
+
+<script>
+(function () {
+  var box = document.querySelector('textarea[name=body]');
+  setInterval(function () {
+    if (document.hidden) return;
+    if (box && box.value.trim() !== '') return;
+    location.reload();
+  }, 20000);
+})();
+</script>
+{{end}}
