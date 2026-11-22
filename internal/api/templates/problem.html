@@ -28,7 +28,12 @@
 </p>
 {{end}}
 
-<p class="meta"><a href="{{.Data.TopicsLink}}">求助贴</a> —— 不会做、WA 得莫名其妙，都在这里问。</p>
+<p class="meta"><a href="{{.Data.TopicsLink}}">求助贴</a> —— 不会做、WA 得莫名其妙，都在这里问。
+{{if .Me}} · <form class="inline" method="post" action="/problems/{{.Data.PID}}/favorite">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  {{if .Data.Contest.ID}}<input type="hidden" name="contest" value="{{.Data.Contest.ID}}">{{end}}
+  <button type="submit">{{if .Data.Favorited}}取消收藏{{else}}收藏{{end}}</button>
+</form>{{end}}</p>
 
 {{if or .Data.CanEdit .Data.CanCases}}
 <p class="meta">{{if .Data.CanEdit}}<a href="/problems/{{.Data.PID}}/edit">编辑题面</a>{{end}}

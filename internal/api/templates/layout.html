@@ -31,6 +31,8 @@
         <a class="account-profile pt-{{.Me.Color}}" href="/u/{{.Me.Handle}}">{{.Me.Name}}<small>@{{.Me.Handle}} · 个人主页</small></a>
         <div class="account-links">
           <a href="/settings">个人设置</a>
+          <a href="/favorites">我的收藏</a>
+          <a href="/review">错题本</a>
           <a href="/tickets">工单{{if .Me.Tickets}} <b class="badge bad">{{.Me.Tickets}}</b>{{end}}</a>
           {{if .Me.Author}}<a href="/problems/new">出题</a>{{end}}
           {{if .Me.Contests}}<a href="/contests/new">办赛</a>{{end}}

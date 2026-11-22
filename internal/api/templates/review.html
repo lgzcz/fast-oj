@@ -1,0 +1,21 @@
+{{define "content"}}
+<h1>错题本</h1>
+<p class="meta">这里自动列出你提交过、但还没有 AC 的题目；通过之后它自己会消失。</p>
+
+<div class="table-scroll" role="region" aria-label="错题本" tabindex="0">
+<table>
+  <tr><th>题目</th><th>难度</th><th class="num">提交</th><th>最后一次</th><th>时间</th></tr>
+  {{range .Data.Rows}}
+  <tr>
+    <td><a href="/problems/{{.PID}}">{{.PID}}</a>　{{.Title}}</td>
+    <td>{{.Difficulty}}</td>
+    <td class="num">{{.Attempts}}</td>
+    <td>{{if .LastVerdict}}<span class="badge {{.LastVerdict}}">{{.LastVerdict}}</span> {{.LastVerdictText}}{{else}}{{.LastVerdictText}}{{end}}</td>
+    <td>{{.LastWhen}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="5">没有待复习的题：要么还没提交过，要么都已经通过了。</td></tr>
+  {{end}}
+</table>
+</div>
+{{end}}

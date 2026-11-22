@@ -301,7 +301,9 @@ type problemData struct {
 	// Attachments are the problem author's own files; the list is part of the page,
 	// the bodies are served only through /attachments/{id}.
 	Attachments []attachmentRow
-	Recent      []subRow
+	// Favorited is whether the signed-in reader has this problem in their list.
+	Favorited bool
+	Recent    []subRow
 }
 
 // contestOfProblem turns the ?contest= of a contest problem link into a checked
@@ -432,6 +434,13 @@ func (s *Server) problemPage(w http.ResponseWriter, r *http.Request, a actor, p 
 		s.writeStoreError(w, r, err)
 		return
 	}
+	favorited := false
+	if a.User.ID != 0 {
+		if favorited, err = s.db.IsFavorite(r.Context(), a.User.ID, p.ID); err != nil {
+			s.writeStoreError(w, r, err)
+			return
+		}
+	}
 	s.page(w, r, http.StatusOK, p.PID+" "+p.Title, "problem", a.viewer(), msgOf(r), problemData{
 		PID: p.PID, Title: p.Title,
 		Time: formatMS(p.TimeLimitMS, false), Mem: formatKB(p.MemLimitKB, false),
@@ -451,6 +460,7 @@ func (s *Server) problemPage(w http.ResponseWriter, r *http.Request, a actor, p 
 		Statement:    renderMarkdownHTML(p.Statement),
 		Samples:      samples,
 		Attachments:  attachmentRows(attItems),
+		Favorited:    favorited,
 		Recent:       rows,
 	})
 }

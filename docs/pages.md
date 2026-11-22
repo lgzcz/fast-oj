@@ -61,6 +61,9 @@
 | `POST` | `/tickets/{id}/attachments/{attachment}/delete` | 同上 | 删一个附件 |
 | `GET` | `/attachments/{id}` | 按归属判定 | 下载附件：题目附件跟随题目可见性（比赛内题目还要在赛内）；工单附件只有作者与处理人能看到；图片内联，其余按附件下载 |
 | `GET` | `/problems/{key}/topics` | 公开 | 这道题的求助贴；从这里进发帖表单会锁主题目 |
+| `POST` | `/problems/{key}/favorite` | 登录用户 | 收藏 / 取消收藏（同一个开关，再点一次就是取消） |
+| `GET` | `/favorites` | 登录用户 | 我的收藏；题目被隐藏后仍列出，但打开题面照常按可见性判定 |
+| `GET` | `/review` | 登录用户 | 错题本：提交过但还没 AC 的题，按最后一次提交倒序 |
 | `GET` | `/feed` | 公开 | 动态时间线，`?user=` `?after=` `?limit=` |
 | `POST` | `/feed` | 登录用户 | 发一条动态（每人每小时 20 条） |
 | `POST` | `/feed/{id}/delete` | 本人或 `feed.moderate` | 删除 |
