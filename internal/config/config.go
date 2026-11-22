@@ -21,8 +21,8 @@ type Config struct {
 	// 代价写清楚：整包 zip 与包内每一条正文现在都是一次性读进内存的，所以不限量意味着
 	// 一次导入按包的大小占内存，判机判这条时也按正文大小占内存（见 judge 里 tc.Input）。
 	// 谁要把这道闸门压回去，就填一个正数——它挡的从来不是"合法的大用例"，而是无界的上传。
-	MaxUpload int64
-	MaxCase   int64
+	MaxUpload  int64
+	MaxCase    int64
 	BCryptCost int
 	Secure     bool
 	// AllowRegister gates self-service signup; M10 moves the switch into the
@@ -145,9 +145,9 @@ func Load(args []string) (Config, error) {
 	fs.StringVar(&c.JudgeToken, "judge-token", os.Getenv("FASTOJ_JUDGE_TOKEN"), "token granting judge access")
 	fs.Int64Var(&c.MaxSource, "max-source", 256<<10, "maximum accepted source/json body bytes")
 	fs.Int64Var(&c.MaxUpload, "max-upload", envInt64("FASTOJ_MAX_UPLOAD", 0),
-		"用例包上传的字节上限（0=不限，默认不限；填正数才设闸）")
+		"用例包上传的字节上限（0=不额外设闸，仍受内置 512 MB 安全上限约束）")
 	fs.Int64Var(&c.MaxCase, "max-case", envInt64("FASTOJ_MAX_CASE", 0),
-		"单个测试点正文的字节上限（0=不限，默认不限：存多大是出题人的事）")
+		"单个测试点正文的字节上限（0=不额外设闸，仍受内置 256 MB 安全上限约束）")
 	fs.IntVar(&c.BCryptCost, "bcrypt-cost", 11, "password hash cost (10 is weak, 14 is slow on login)")
 	fs.BoolVar(&c.Secure, "secure-cookies", false, "mark session cookies Secure (enable when serving over TLS)")
 	noRegister := fs.Bool("no-register", false, "关闭自助注册")

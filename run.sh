@@ -5,6 +5,10 @@
 #   FASTOJ_ADDR=0.0.0.0:8080 ./run.sh         # 同网段都能访问（判机仍走 127.0.0.1）
 #   JUDGE=0 ./run.sh                          # 只起服务器，判机在另一台机器上
 #   FASTOJ_ADMIN_TOKEN=xxx FASTOJ_JUDGE_TOKEN=yyy ./run.sh   # 用固定令牌
+#   FASTOJ_MAX_CASE=67108864 FASTOJ_MAX_UPLOAD=536870912 ./run.sh   # 公开站建议收紧用例包
+#
+# 不设 max-case/max-upload 时有内置安全上限（单条 256 MB、整包 512 MB），
+# 但公开注册站应当再收紧一档：上限要小于可用内存 ÷ 同时导入的人数。
 #
 # 其余参数原样传给服务器，比如 ./run.sh -no-register -v
 set -eu

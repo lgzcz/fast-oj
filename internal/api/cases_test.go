@@ -534,11 +534,27 @@ func TestCaseSizeCapIsOffByDefaultAndStillWorksWhenSet(t *testing.T) {
 	kept := newHarnessCfg(t, func(c *config.Config) { c.MaxCase = 1 << 20; c.MaxUpload = 0 })
 	keeper := kept.caseProblem("capon", "P713")
 	code, body := kept.uploadZipAs(keeper, "/problems/P713/cases/upload", archive)
-	if !strings.Contains(body, "over 1048576 bytes") {
+	if code != http.StatusRequestEntityTooLarge || !strings.Contains(body, "1 MB") {
 		t.Fatalf("设了 1 MB 的单条闸门，1.2 MB 却照样收下了：%d\n%s", code, short(body))
 	}
 	if _, err := kept.db.GetTestcase(ctx(), kept.problem("P713").ID, "1"); err == nil {
 		t.Error("被闸门挡住的那条还是落库了")
+	}
+}
+
+// 两道预算各挡一种包：中央目录声明的大小先挡声明式炸弹，读的时候再按剩余预算
+// 截断伪造声明的那种。这里用小预算直接测函数，等比放大就是线上的 256/512 MB。
+func TestCollectCasesEnforcesPerCaseAndTotalBudgets(t *testing.T) {
+	archive := zipOf(map[string]string{"1.in": strings.Repeat("a", 2048), "1.out": "ok\n"})
+
+	if _, err := collectCases(archive, 1024, 1<<20); err == nil || !strings.Contains(err.Error(), "1 MB") {
+		t.Fatalf("单条预算 = %v", err)
+	}
+	if _, err := collectCases(archive, 1<<20, 1024); err == nil || !strings.Contains(err.Error(), "1 MB") {
+		t.Fatalf("整包预算 = %v", err)
+	}
+	if pairs, err := collectCases(archive, 1<<20, 1<<20); err != nil || len(pairs) != 1 {
+		t.Fatalf("放得下的包 = %+v %v", pairs, err)
 	}
 }
 

@@ -190,13 +190,57 @@ type casePair struct {
 	Input, Output []byte
 }
 
+const (
+	// 0 = 不限量是产品语义（存多大的测试点是出题人的事），但"不限"不该等于
+	// "一份压缩包可以把进程打穿"。下面两道是内置天花板：部署时用 -max-case /
+	// -max-upload 显式收紧，没设时也不会被声明式或流式炸弹无界地吃内存。
+	maxCaseCeiling    = int64(256 << 20)
+	maxArchiveCeiling = int64(512 << 20)
+)
+
+// caseLimits resolves the per-entry and whole-archive budgets. An explicit
+// -max-case above the ceiling is respected: the operator asked for it, and the
+// total budget grows with it so a single legal case is never cut in half.
+func (s *Server) caseLimits() (perCase, total int64) {
+	perCase = s.cfg.MaxCase
+	if perCase <= 0 {
+		perCase = maxCaseCeiling
+	}
+	total = maxArchiveCeiling
+	if perCase > total {
+		total = perCase
+	}
+	return perCase, total
+}
+
+func mbText(n int64) int64 {
+	return (n + (1 << 20) - 1) >> 20
+}
+
+// caseLimitError is the one collectCases failure that answers 413 instead of
+// bouncing back to the case page: the upload itself was too big, not malformed.
+type caseLimitError struct{ msg string }
+
+func (e *caseLimitError) Error() string { return e.msg }
+
 // collectCases pairs <stem>.in with <stem>.out or <stem>.ans inside a zip archive.
 // Entries are flattened to their base name, so a nested path cannot escape anywhere.
+//
+// Two guards run before and during the read: the central directory's declared size
+// is checked against the per-entry and total budgets (this rejects a declaration
+// bomb before any decompression), and readCapped streams at most the remaining
+// budget (this rejects an archive that lies about its size).
 func (s *Server) collectCases(zipBody []byte) ([]casePair, error) {
+	perCase, total := s.caseLimits()
+	return collectCases(zipBody, perCase, total)
+}
+
+func collectCases(zipBody []byte, perCase, total int64) ([]casePair, error) {
 	zr, err := zip.NewReader(bytes.NewReader(zipBody), int64(len(zipBody)))
 	if err != nil {
 		return nil, fmt.Errorf("not a zip archive: %w", err)
 	}
+	remaining := total
 	byName := map[string]*casePair{}
 	answerExt := map[string]string{}
 	for _, f := range zr.File {
@@ -209,22 +253,35 @@ func (s *Server) collectCases(zipBody []byte) ([]casePair, error) {
 		if stem == "" || (ext != ".in" && ext != ".out" && ext != ".ans") {
 			continue
 		}
-		// 单个测试点默认不限量：闸门只在设了数字时才存在（见 config 里 MaxCase 那段）。
-		if s.cfg.MaxCase > 0 && f.UncompressedSize64 > uint64(s.cfg.MaxCase) {
-			return nil, fmt.Errorf("case %s over %d bytes", base, s.cfg.MaxCase)
+		if f.UncompressedSize64 > uint64(perCase) {
+			return nil, &caseLimitError{fmt.Sprintf("测试点 %s 超过 %d MB", base, mbText(perCase))}
+		}
+		if int64(f.UncompressedSize64) > remaining {
+			return nil, &caseLimitError{fmt.Sprintf("整包用例解压后超过 %d MB", mbText(total))}
+		}
+		limit := perCase
+		if remaining < limit {
+			limit = remaining
+		}
+		if limit <= 0 {
+			return nil, &caseLimitError{fmt.Sprintf("整包用例解压后超过 %d MB", mbText(total))}
 		}
 		rc, err := f.Open()
 		if err != nil {
 			return nil, err
 		}
-		body, tooBig, err := readCapped(rc, s.cfg.MaxCase)
+		body, tooBig, err := readCapped(rc, limit)
 		rc.Close()
 		if err != nil {
 			return nil, err
 		}
 		if tooBig {
-			return nil, fmt.Errorf("case %s over %d bytes", base, s.cfg.MaxCase)
+			if limit < perCase {
+				return nil, &caseLimitError{fmt.Sprintf("整包用例解压后超过 %d MB", mbText(total))}
+			}
+			return nil, &caseLimitError{fmt.Sprintf("测试点 %s 超过 %d MB", base, mbText(perCase))}
 		}
+		remaining -= int64(len(body))
 		pair := byName[stem]
 		if pair == nil {
 			pair = &casePair{Name: stem}
@@ -286,6 +343,11 @@ func (s *Server) handleCaseUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	pairs, err := s.collectCases(zipBody)
 	if err != nil {
+		var over *caseLimitError
+		if errors.As(err, &over) {
+			s.respondError(w, r, http.StatusRequestEntityTooLarge, err.Error())
+			return
+		}
 		s.backToCases(w, r, p, err.Error())
 		return
 	}
@@ -366,8 +428,11 @@ func readCapped(src io.Reader, limit int64) ([]byte, bool, error) {
 // readUpload accepts a raw zip body, or a zip inside a multipart file part.
 func (s *Server) readUpload(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
 	defer r.Body.Close()
+	limit := s.uploadLimit()
 	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
-		if err := r.ParseMultipartForm(s.cfg.MaxUpload); err != nil {
+		// 这里只决定"多少留在内存里"，真正的字节上限由下面的 readCapped 管；
+		// 把天花板当 maxMemory 会把整包先收进 RAM。
+		if err := r.ParseMultipartForm(multipartMemory); err != nil {
 			s.respondError(w, r, http.StatusBadRequest, "bad multipart upload: "+err.Error())
 			return nil, false
 		}
@@ -380,7 +445,7 @@ func (s *Server) readUpload(w http.ResponseWriter, r *http.Request) ([]byte, boo
 			return nil, false
 		}
 		defer file.Close()
-		body, tooBig, err := readCapped(file, s.cfg.MaxUpload)
+		body, tooBig, err := readCapped(file, limit)
 		if err != nil || tooBig {
 			s.respondError(w, r, http.StatusRequestEntityTooLarge, s.uploadTooBigText())
 			return nil, false
@@ -388,7 +453,7 @@ func (s *Server) readUpload(w http.ResponseWriter, r *http.Request) ([]byte, boo
 		return body, true
 	}
 
-	body, tooBig, err := readCapped(r.Body, s.cfg.MaxUpload)
+	body, tooBig, err := readCapped(r.Body, limit)
 	if err != nil {
 		s.respondError(w, r, http.StatusBadRequest, "unreadable body")
 		return nil, false
@@ -404,12 +469,18 @@ func (s *Server) readUpload(w http.ResponseWriter, r *http.Request) ([]byte, boo
 	return body, true
 }
 
-// uploadTooBigText 是设了闸又超了时那一句；没设闸时这句用不上，但也不能编一个数字出来。
-func (s *Server) uploadTooBigText() string {
-	if s.cfg.MaxUpload <= 0 {
-		return "upload too large"
+// uploadLimit keeps -max-upload=0 from meaning "read the request body forever":
+// the flag's off position still has the archive safety ceiling.
+func (s *Server) uploadLimit() int64 {
+	if s.cfg.MaxUpload > 0 {
+		return s.cfg.MaxUpload
 	}
-	return fmt.Sprintf("upload over %d bytes", s.cfg.MaxUpload)
+	return maxArchiveCeiling
+}
+
+// uploadTooBigText 是设了闸又超了时那一句；没设闸时用内置天花板，不编一个不存在的配置数字。
+func (s *Server) uploadTooBigText() string {
+	return fmt.Sprintf("用例包超过 %d MB", mbText(s.uploadLimit()))
 }
 
 // handleCaseBody streams one case file. Sample data is public; judged data needs
