@@ -53,6 +53,9 @@
 | `GET` | `/contests/{key}/standings` | 见[比赛](contests.md#比赛限时--独立榜--加入码--队伍oiioiacm-三种赛制) | 该比赛独立榜，不影响 `/rank`；OI 比赛结束前除主办方外看不到 |
 | `GET` | `/contests/{key}/p/{题号}` | 成员或主办方 | 比赛内题号入口，进去的提交自动归属该比赛 |
 | `GET` | `/rank` | 公开 | 排行榜：按去重后的 AC 题数排，另有「积分」那一列（活跃度读数，见[积分与名字颜色](points.md#积分与名字颜色adminpoints)） |
+| `GET` | `/weekly` | 公开 | host 标成「周赛」的比赛汇总；不自动排期 |
+| `POST` | `/contests/{key}/virtual/start` | 比赛成员或主办方 | 用已结束比赛的原时长开一场虚拟赛 |
+| `GET` `/POST` | `/virtual` `/virtual/{id}` `/virtual/{id}/finish` | 登录用户（仅自己的） | 虚拟比赛列表、成绩页与提前结束 |
 | `GET` | `/topics` | 公开 | 社区贴列表（统一管理页），`?q=` `?after=` `?limit=`；登录后每行带上「你能删」的删除按钮 |
 | `GET` `/POST` | `/topics/new` `/topics` | 登录用户 | 发帖：类型（求助 / 社区）、标题、正文（可预览）、题号 |
 | `GET` | `/topics/{id}` | 公开 | 帖子正文与评论；未登录只能看 |

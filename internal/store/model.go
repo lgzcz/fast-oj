@@ -34,6 +34,9 @@ type User struct {
 	Points      int    `json:"points"`
 	PointsParts string `json:"-"`
 	Color       string `json:"color,omitempty"`
+	// Rating is the Elo-style contest rating; accounts start at 1200 and only
+	// contests marked 计入 rating move it.
+	Rating int `json:"rating"`
 }
 
 // ColorClass 是渲染名字时用的那一档：库里存的空串表示"最低一档"，页面需要一个类名，

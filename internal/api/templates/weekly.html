@@ -1,0 +1,22 @@
+{{define "content"}}
+<h1>周赛</h1>
+<p class="meta">这里收集 host 标成「周赛」的比赛；排期仍由 host 每周创建。{{if .Data.SignedIn}}<a href="/contests">全部比赛</a>{{end}}</p>
+
+<div class="table-scroll" role="region" aria-label="周赛列表" tabindex="0">
+<table>
+  <tr><th>编号</th><th>标题</th><th>状态</th><th>赛制</th><th>开始</th><th>结束</th></tr>
+  {{range .Data.Rows}}
+  <tr>
+    <td><a href="/contests/{{.CID}}">{{.CID}}</a>{{if .Hidden}} <span class="hidden">未公开</span>{{end}}</td>
+    <td><a href="/contests/{{.CID}}">{{.Title}}</a>{{if .Private}} <span class="warn">私有</span>{{end}}{{if .Rated}} <span class="badge">Rating</span>{{end}}</td>
+    <td><span class="badge {{.PhaseClass}}">{{.Phase}}</span></td>
+    <td>{{.Mode}}</td>
+    <td>{{.Start}}</td>
+    <td>{{.End}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="6">还没有标成周赛的比赛。</td></tr>
+  {{end}}
+</table>
+</div>
+{{end}}

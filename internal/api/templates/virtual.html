@@ -1,0 +1,36 @@
+{{define "content"}}
+<h1>虚拟比赛 · {{.Data.Title}}</h1>
+<p class="meta">
+  <a href="/contests/{{.Data.CID}}">{{.Data.CID}}</a> · {{.Data.Mode}} 赛制
+  · {{.Data.Window}} · {{.Data.State}}
+</p>
+<p class="meta">总分 <b>{{.Data.Total}}</b> / {{.Data.MaxTotal}} · 通过 <b>{{.Data.Solved}}</b> 题 · 开始于 {{.Data.Started}}</p>
+
+{{if .Data.Running}}
+<form method="post" action="/virtual/{{.Data.ID}}/finish"
+      onsubmit="return confirm('提前结束？之后的提交不再计入这次成绩。')">
+  <input type="hidden" name="csrf" value="{{.Me.CSRF}}">
+  <p><button type="submit">提前结束</button></p>
+</form>
+{{end}}
+
+<div class="table-scroll" role="region" aria-label="虚拟比赛题目" tabindex="0">
+<table>
+  <tr><th>题目</th><th class="num">得分</th><th class="num">满分</th><th class="num">提交</th><th>状态</th></tr>
+  {{range .Data.Problems}}
+  <tr>
+    <td><a href="/problems/{{.PID}}">{{.PID}}</a>　{{.Title}}</td>
+    <td class="num">{{.Points}}</td>
+    <td class="num">{{.Max}}</td>
+    <td class="num">{{.Attempts}}</td>
+    <td>{{if .Solved}}<span class="status status-solved">AC</span>{{else}}<span class="status status-untried">未通过</span>{{end}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="5">这场比赛没有挂题。</td></tr>
+  {{end}}
+</table>
+</div>
+
+<p class="meta">成绩按开始之后、结束之前的普通提交现算；刷新页面就能看到最新结果。
+  <a href="/virtual">所有虚拟比赛 →</a></p>
+{{end}}

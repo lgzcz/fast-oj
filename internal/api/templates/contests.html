@@ -21,7 +21,7 @@
   {{range .Data.Rows}}
   <tr>
     <td><a href="/contests/{{.CID}}">{{.CID}}</a>{{if .Hidden}} <span class="hidden">未公开</span>{{end}}</td>
-    <td><a href="/contests/{{.CID}}">{{.Title}}</a>{{if .Private}} <span class="warn">私有</span>{{end}}</td>
+    <td><a href="/contests/{{.CID}}">{{.Title}}</a>{{if .Private}} <span class="warn">私有</span>{{end}}{{if .Weekly}} <span class="badge">周赛</span>{{end}}{{if .Rated}} <span class="badge">Rating</span>{{end}}</td>
     <td><span class="badge {{.PhaseClass}}">{{.Phase}}</span></td>
     <td>{{.Mode}}</td>
     <td>{{.Start}}</td>
@@ -40,5 +40,5 @@
   共 {{.Data.Total}} 场
   {{if .Data.Next}}· <a href="/contests?after={{.Data.Next}}&limit={{.Data.Limit}}{{with .Data.Query}}&q={{.}}{{end}}">下一页 →</a>{{end}}
 </p>
-<p class="meta">私有比赛要加入码才能进；封榜的比赛只把自己那一行给本人看。</p>
+<p class="meta">私有比赛要加入码才能进；封榜的比赛只把自己那一行给本人看。周赛汇总在 <a href="/weekly">/weekly</a>。</p>
 {{end}}

@@ -714,6 +714,8 @@ type userData struct {
 	// Points 与 Dims 是后台算好的活跃度与它的四维明细：个人页把"分是怎么来的"摊开，
 	// 一个人不必猜自己为什么是绿的、别人为什么是红的。
 	Points int
+	// Rating is the Elo number moved by 计入 rating contests.
+	Rating int
 	Dims   []store.Dim
 	// NameColor 是这个名字该渲染成哪一档。
 	NameColor  string
@@ -850,7 +852,7 @@ func (s *Server) handleUser(w http.ResponseWriter, r *http.Request) {
 		// user_id produced, but nobody can follow, message or log in as it.
 		Cancelled: u.IsCancelled(),
 		Solved:    len(solved), TotalProblems: totalProblems, Submits: submits,
-		Points: u.Points, Dims: u.Dims(), NameColor: u.ColorClass(),
+		Points: u.Points, Rating: u.Rating, Dims: u.Dims(), NameColor: u.ColorClass(),
 		Tally: tallyRows, SolvedList: solvedList, Recent: rows,
 		Posts:     postRows(myPosts, a),
 		IsSelf:    a.User.ID == u.ID,

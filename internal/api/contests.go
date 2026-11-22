@@ -122,6 +122,7 @@ type contestForm struct {
 	PenaltyMS                   int64
 	TeamSize                    int
 	StandingOpen, Visible       bool
+	Rated, Weekly               bool
 	// The raw text of every numeric and time field, so a rejected save can put back
 	// exactly what was typed instead of a plausible-looking zero.
 	StartText, EndText        string
@@ -133,6 +134,7 @@ func (f contestForm) apply(c *store.Contest) {
 	c.JoinCode, c.StartAt, c.EndAt = f.JoinCode, f.StartAt, f.EndAt
 	c.PenaltyMS, c.TeamSize = f.PenaltyMS, f.TeamSize
 	c.StandingOpen, c.Visible = f.StandingOpen, f.Visible
+	c.Rated, c.Weekly = f.Rated, f.Weekly
 }
 
 // parseContestForm reads the form and reports every problem in it, so a rejected
@@ -150,6 +152,8 @@ func parseContestForm(r *http.Request) (contestForm, []string) {
 		PenaltyText:  strings.TrimSpace(r.FormValue("penalty_s")),
 		StandingOpen: r.FormValue("standing_open") == "1",
 		Visible:      r.FormValue("visible") == "1",
+		Rated:        r.FormValue("rated") == "1",
+		Weekly:       r.FormValue("weekly") == "1",
 	}
 	var errs []string
 	if ms, ok := parseContestTime(f.StartText); ok {
@@ -202,6 +206,7 @@ type contestData struct {
 	TeamSize                    int
 	TeamSizeText, PenaltyText   string
 	StandingOpen, Visible       bool
+	Rated, Weekly               bool
 	IsNew                       bool
 	Errors                      []string
 	Preview                     template.HTML
@@ -241,6 +246,7 @@ func newContestData(c store.Contest, isNew bool) contestData {
 	d.TeamSize, d.TeamSizeText = c.TeamSize, strconv.Itoa(c.TeamSize)
 	d.PenaltyText = strconv.FormatInt(c.PenaltyMS/1000, 10)
 	d.StandingOpen, d.Visible = c.StandingOpen, c.Visible
+	d.Rated, d.Weekly = c.Rated, c.Weekly
 	d.PhaseLabel, d.PhaseClass = phaseView(c, time.Now().UnixMilli())
 	d.Window = formatContestClock(c.StartAt) + " —— " + formatContestClock(c.EndAt)
 	return d
@@ -252,6 +258,7 @@ func (d *contestData) fillFromForm(f contestForm, errs []string) {
 	d.JoinCode = f.JoinCode
 	d.StartText, d.EndText = f.StartText, f.EndText
 	d.TeamSize, d.Visible, d.StandingOpen = f.TeamSize, f.Visible, f.StandingOpen
+	d.Rated, d.Weekly = f.Rated, f.Weekly
 	d.TeamSizeText, d.PenaltyText = f.TeamSizeText, f.PenaltyText
 	d.Errors = errs
 }
@@ -360,6 +367,8 @@ func (s *Server) handleContestList(w http.ResponseWriter, r *http.Request) {
 			Private:   item.JoinCode != "",
 			Hidden:    !item.Visible,
 			BoardOpen: item.StandingOpen,
+			Rated:     item.Rated,
+			Weekly:    item.Weekly,
 		})
 	}
 	s.page(w, r, http.StatusOK, "比赛", "contests", a.viewer(), msgOf(r), map[string]any{
@@ -379,6 +388,8 @@ type contestListRow struct {
 	Private    bool
 	Hidden     bool
 	BoardOpen  bool
+	Rated      bool
+	Weekly     bool
 }
 
 func contestModeLabel(mode string) string {
@@ -714,6 +725,15 @@ type contestHomeData struct {
 	TeamSize     int
 	PenaltyText  string
 	BoardOpen    bool
+	Rated, Weekly bool
+	// RatingNote is what this contest did to the viewer's rating after it ended.
+	RatingNote string
+	// Virtual contests: one at a time per contest, only after the contest is over.
+	HasVirtual      bool
+	VirtualID       int64
+	VirtualRunning  bool
+	VirtualNote     string
+	CanStartVirtual bool
 	// BoardPending is the OI case: the board exists but nobody but the host may see
 	// it until the clock stops.
 	BoardPending bool
@@ -759,6 +779,8 @@ func (s *Server) handleContestHome(w http.ResponseWriter, r *http.Request) {
 		Window:       formatContestClock(c.StartAt) + " —— " + formatContestClock(c.EndAt),
 		TeamSize:     c.TeamSize, Access: access, CanManage: access.CanManage,
 		BoardOpen:    c.StandingOpen && c.BoardLive(now),
+		Rated:        c.Rated,
+		Weekly:       c.Weekly,
 		BoardPending: !c.BoardLive(now),
 		Private:      c.JoinCode != "",
 		// 已结束不再收人：赛后补进榜会把榜单变成一份事后总结。
@@ -777,6 +799,35 @@ func (s *Server) handleContestHome(w http.ResponseWriter, r *http.Request) {
 	d.Phase = c.Phase(now).Label()
 	d.PhaseClass = c.Phase(now).Badge()
 	d.PenaltyText = penaltyNote(c)
+	if a.User.ID != 0 && c.Rated && c.RatingDone {
+		if cr, ok, err := s.db.ContestRatingFor(r.Context(), c.ID, a.User.ID); err != nil {
+			s.writeStoreError(w, r, err)
+			return
+		} else if ok {
+			sign := "+"
+			if cr.Delta < 0 {
+				sign = ""
+			}
+			d.RatingNote = "这场比赛的 rating 结算：" + strconv.Itoa(cr.Before) + " → " + strconv.Itoa(cr.After) +
+				"（" + sign + strconv.Itoa(cr.Delta) + "）"
+		}
+	}
+	if c.Phase(now) == store.PhaseOver && a.User.ID != 0 && (access.Joined || access.CanManage) {
+		if v, ok, err := s.db.CurrentVirtualContest(r.Context(), a.User.ID, c.ID); err != nil {
+			s.writeStoreError(w, r, err)
+			return
+		} else if ok {
+			d.HasVirtual, d.VirtualID = true, v.ID
+			d.VirtualRunning = v.Running(now)
+			if d.VirtualRunning {
+				d.VirtualNote = "进行中，剩余 " + formatSpan(v.EndAt-now)
+			} else {
+				d.VirtualNote = "时间到，可以去结束它"
+			}
+		} else {
+			d.CanStartVirtual = true
+		}
+	}
 	if access.ShowProblems {
 		problems, err := s.db.ListContestProblems(r.Context(), c.ID)
 		if err != nil {

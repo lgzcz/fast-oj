@@ -23,7 +23,8 @@ const BootstrapHandle = "admin"
 // 本来就拿着这一行。分开查会让每一页多一次查询，只为了拿两个已经在 users 上的标量。
 const userColumns = `id, handle, IFNULL(email, ''), display_name, bio, role, status, dm_policy,
 		(passhash <> '') AS has_password, IFNULL(email_verified, 1), created_at, IFNULL(last_login_at, 0),
-		IFNULL(theme, ''), IFNULL(tags, ''), IFNULL(points, 0), IFNULL(points_parts, ''), IFNULL(color, '')`
+		IFNULL(theme, ''), IFNULL(tags, ''), IFNULL(points, 0), IFNULL(points_parts, ''), IFNULL(color, ''),
+		IFNULL(rating, 1200)`
 
 func scanUser(row scanner) (User, error) {
 	var (
@@ -33,7 +34,7 @@ func scanUser(row scanner) (User, error) {
 	)
 	err := row.Scan(&u.ID, &u.Handle, &u.Email, &u.DisplayName, &u.Bio, &u.Role, &u.Status,
 		&u.DMPolicy, &hasPass, &verifiedMS, &u.CreatedAt, &u.LastLoginAt,
-		&u.Theme, &u.Tags, &u.Points, &u.PointsParts, &u.Color)
+		&u.Theme, &u.Tags, &u.Points, &u.PointsParts, &u.Color, &u.Rating)
 	u.HasPassword = hasPass != 0
 	u.EmailVerified = verifiedMS != 0
 	return u, notFound(err)

@@ -67,6 +67,14 @@
     <input type="checkbox" name="standing_open" value="1" {{if .Data.StandingOpen}}checked{{end}}>
     榜单公示（不勾 = 封榜，别人看不到你的行，自己仍能看到自己）
   </label>
+  <label class="check">
+    <input type="checkbox" name="rated" value="1" {{if .Data.Rated}}checked{{end}}>
+    计入 rating（比赛结束后按名次结算一次；虚拟比赛不计）
+  </label>
+  <label class="check">
+    <input type="checkbox" name="weekly" value="1" {{if .Data.Weekly}}checked{{end}}>
+    标为周赛（出现在 /weekly）
+  </label>
 
   <label>比赛说明</label>
   <textarea name="statement" rows="10" spellcheck="false" autocomplete="off" placeholder="## 说明&#10;&#10;本场共 $n$ 题……">{{.Data.Statement}}</textarea>

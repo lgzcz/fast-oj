@@ -1,0 +1,20 @@
+{{define "content"}}
+<h1>虚拟比赛</h1>
+<p class="meta">用已经结束的比赛和它的原时长给自己计时。提交是普通练习提交，不进正式榜，也不参与 rating。</p>
+
+<div class="table-scroll" role="region" aria-label="虚拟比赛列表" tabindex="0">
+<table>
+  <tr><th>比赛</th><th>赛制</th><th>时段</th><th>状态</th></tr>
+  {{range .Data.Rows}}
+  <tr>
+    <td><a href="/virtual/{{.ID}}">{{.CID}} {{.Title}}</a></td>
+    <td>{{.Mode}}</td>
+    <td>{{.Window}}</td>
+    <td>{{.State}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="4">还没有虚拟比赛。到一场已结束的比赛主页点「开始虚拟比赛」。</td></tr>
+  {{end}}
+</table>
+</div>
+{{end}}

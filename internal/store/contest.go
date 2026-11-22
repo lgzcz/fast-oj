@@ -64,8 +64,13 @@ type Contest struct {
 	TeamSize     int
 	PenaltyMS    int64
 	OwnerID      int64
-	CreatedAt    int64
-	UpdatedAt    int64
+	// Rated contests move the Elo-style rating once, after they end; Weekly is
+	// just the label the /weekly page collects.
+	Rated      bool
+	RatingDone bool
+	Weekly     bool
+	CreatedAt  int64
+	UpdatedAt  int64
 }
 
 // Phase is read off the clock and never stored, so no scheduled job can leave a
@@ -175,16 +180,19 @@ func (m ContestMember) DisplayName() string {
 }
 
 const contestColumns = `id, cid, title, statement, start_at, end_at, mode, join_code,
-		standing_open, visible, team_size, penalty_ms, IFNULL(owner_id, 0), created_at, updated_at`
+		standing_open, visible, team_size, penalty_ms, IFNULL(owner_id, 0), created_at, updated_at,
+		IFNULL(rated, 0), IFNULL(rating_done, 0), IFNULL(weekly, 0)`
 
 func scanContest(row scanner) (Contest, error) {
 	var (
-		p                 Contest
-		standing, visible int
+		p                                Contest
+		standing, visible, rated, done, weekly int
 	)
 	err := row.Scan(&p.ID, &p.CID, &p.Title, &p.Statement, &p.StartAt, &p.EndAt, &p.Mode, &p.JoinCode,
-		&standing, &visible, &p.TeamSize, &p.PenaltyMS, &p.OwnerID, &p.CreatedAt, &p.UpdatedAt)
+		&standing, &visible, &p.TeamSize, &p.PenaltyMS, &p.OwnerID, &p.CreatedAt, &p.UpdatedAt,
+		&rated, &done, &weekly)
 	p.StandingOpen, p.Visible = standing != 0, visible != 0
+	p.Rated, p.RatingDone, p.Weekly = rated != 0, done != 0, weekly != 0
 	return p, notFound(err)
 }
 
@@ -227,12 +235,13 @@ func (db *DB) CreateContest(ctx context.Context, c *Contest) (Contest, error) {
 	}
 	res, err := db.SQL.ExecContext(ctx,
 		`INSERT INTO contests (cid, title, statement, start_at, end_at, mode, join_code,
-		                      standing_open, visible, team_size, penalty_ms, owner_id, created_at, updated_at)
+		                      standing_open, visible, team_size, penalty_ms, owner_id, created_at, updated_at,
+		                      rated, weekly)
 		 SELECT COALESCE(?, 'C' || substr('0000' || (SELECT IFNULL(MAX(id), 0) + 1 FROM contests), -4)),
-		        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?`,
+		        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?`,
 		cid, c.Title, c.Statement, c.StartAt, c.EndAt, c.Mode, c.JoinCode,
 		boolInt(c.StandingOpen), boolInt(c.Visible), c.TeamSize, c.PenaltyMS,
-		nullInt64(c.OwnerID), c.CreatedAt, c.UpdatedAt)
+		nullInt64(c.OwnerID), c.CreatedAt, c.UpdatedAt, boolInt(c.Rated), boolInt(c.Weekly))
 	if err != nil {
 		return Contest{}, conflict(err, "比赛编号 "+c.CID)
 	}
@@ -250,9 +259,10 @@ func (db *DB) UpdateContest(ctx context.Context, c Contest) (Contest, error) {
 	c.UpdatedAt = nowMS()
 	_, err := db.SQL.ExecContext(ctx,
 		`UPDATE contests SET cid=?, title=?, statement=?, start_at=?, end_at=?, mode=?, join_code=?,
-		        standing_open=?, visible=?, team_size=?, penalty_ms=?, updated_at=? WHERE id=?`,
+		        standing_open=?, visible=?, team_size=?, penalty_ms=?, rated=?, weekly=?, updated_at=? WHERE id=?`,
 		c.CID, c.Title, c.Statement, c.StartAt, c.EndAt, modeColumn(c.Mode), c.JoinCode,
-		boolInt(c.StandingOpen), boolInt(c.Visible), c.TeamSize, c.PenaltyMS, c.UpdatedAt, c.ID)
+		boolInt(c.StandingOpen), boolInt(c.Visible), c.TeamSize, c.PenaltyMS,
+		boolInt(c.Rated), boolInt(c.Weekly), c.UpdatedAt, c.ID)
 	if err != nil {
 		return Contest{}, conflict(err, "比赛编号 "+c.CID)
 	}
@@ -306,7 +316,8 @@ type ContestPage struct {
 
 // listCols is the list projection without join_code.
 const listCols = `id, cid, title, statement, start_at, end_at, mode,
-		standing_open, visible, team_size, penalty_ms, IFNULL(owner_id, 0), created_at, updated_at`
+		standing_open, visible, team_size, penalty_ms, IFNULL(owner_id, 0), created_at, updated_at,
+		IFNULL(rated, 0), IFNULL(rating_done, 0), IFNULL(weekly, 0)`
 
 // ListContests pages by row id descending. The cursor has to be the sort key, so
 // the newest contest created leads and the phase badge tells the state.
@@ -343,15 +354,17 @@ func (db *DB) ListContests(ctx context.Context, after int64, limit int, search s
 	var page ContestPage
 	for rows.Next() {
 		var (
-			c                 Contest
-			standing, visible int
+			c                                      Contest
+			standing, visible, rated, done, weekly int
 		)
 		err := rows.Scan(&c.ID, &c.CID, &c.Title, &c.Statement, &c.StartAt, &c.EndAt, &c.Mode,
-			&standing, &visible, &c.TeamSize, &c.PenaltyMS, &c.OwnerID, &c.CreatedAt, &c.UpdatedAt)
+			&standing, &visible, &c.TeamSize, &c.PenaltyMS, &c.OwnerID, &c.CreatedAt, &c.UpdatedAt,
+			&rated, &done, &weekly)
 		if err != nil {
 			return page, err
 		}
 		c.StandingOpen, c.Visible = standing != 0, visible != 0
+		c.Rated, c.RatingDone, c.Weekly = rated != 0, done != 0, weekly != 0
 		page.Items = append(page.Items, ContestSummary{Contest: c})
 	}
 	if err := rows.Err(); err != nil {

@@ -72,6 +72,7 @@ func run() error {
 	// 判机租约：每次进度回报都会刷新 started_at，所以 5 分钟没消息就认为判机死了。
 	// 不接这班岗，判机崩溃后提交会永远停在 compiling/running（见 docs/judge-protocol.md）。
 	go db.RunReaper(ctx, 30*time.Second, 5*time.Minute, log)
+	go db.RunRatingWorker(ctx, time.Minute, log)
 	// 过期会话不会影响正确性（每次查询都带 expires_at），但不清就一行登录一行地长。
 	go db.RunSessionPruner(ctx, 24*time.Hour, log)
 
