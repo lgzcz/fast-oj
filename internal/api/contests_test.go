@@ -318,6 +318,67 @@ func TestHiddenContestIsInvisibleToThePublic(t *testing.T) {
 	}
 }
 
+// 比赛进行中，题面、时限与用例属于比赛：作者自己也改不了；主办方可以修正明显错误；
+// 赛后恢复编辑。
+func TestRunningContestFreezesAuthoring(t *testing.T) {
+	h := newHarness(t)
+	author := h.signIn("fzauthor", permProblemCreate, permJudgeProgram)
+	host := h.signIn("fzhost", permContestCreate, permProblemEditAny)
+	h.readyProblemAs(author, "P8800")
+	if code, body := h.createContest(host, contestValues("C8800", "冻结赛")); code != http.StatusOK {
+		t.Fatalf("建比赛 = %d %s", code, short(body))
+	}
+	if _, body := h.postAs(host, "/contests/C8800/problems", url.Values{
+		"problem": {"P8800"}, "points": {"100"}, "label": {""},
+	}); !strings.Contains(body, "已挂上") {
+		t.Fatalf("挂题：%s", short(body))
+	}
+
+	edit := url.Values{"pid": {"P8800"}, "title": {"赛中改题"}, "statement": {"x"},
+		"time_ms": {"2000"}, "mem_mb": {"256"}, "languages": {"c", "cpp"}, "visible": {"1"}}
+	if code, body := h.postAs(author, "/problems/P8800", edit); code != http.StatusForbidden ||
+		!strings.Contains(body, "C8800") {
+		t.Fatalf("作者赛中改题 = %d %s", code, short(body))
+	}
+	if code, _ := h.postAs(author, "/problems/P8800/cases", url.Values{
+		"name": {"freeze1"}, "score": {"1"}, "input": {"1\n"}, "output": {"1\n"},
+	}); code != http.StatusForbidden {
+		t.Fatalf("作者赛中加用例 = %d", code)
+	}
+	id := h.caseID("P8800", "1")
+	if code, _ := h.postAs(author, "/problems/P8800/cases/"+idText(id)+"/delete", url.Values{}); code != http.StatusForbidden {
+		t.Fatalf("作者赛中删用例 = %d", code)
+	}
+	if code, _ := h.postAs(author, "/problems/P8800/cases/wipe", url.Values{}); code != http.StatusForbidden {
+		t.Fatalf("作者赛中清空用例 = %d", code)
+	}
+	if code, _ := h.postAs(author, "/problems/P8800/judge_program", url.Values{
+		"kind": {"checker"}, "language": {"cpp"}, "source": {"int main(){return 0;}"},
+	}); code != http.StatusForbidden {
+		t.Fatalf("作者赛中换 SPJ = %d", code)
+	}
+	if p := h.problem("P8800"); p.Title != "别人的题" || p.TimeLimitMS != 1000 {
+		t.Fatalf("被拒的修改还是改了库：%+v", p)
+	}
+
+	// 主办方仍然可以赛中修正。
+	if code, body := h.postAs(host, "/problems/P8800", edit); code != http.StatusOK ||
+		!strings.Contains(body, "赛中改题") {
+		t.Fatalf("主办方改题 = %d %s", code, short(body))
+	}
+
+	// 比赛结束后作者恢复编辑。
+	if _, err := h.db.SQL.ExecContext(ctx(), `UPDATE contests SET end_at=? WHERE cid=?`,
+		time.Now().Add(-time.Minute).UnixMilli(), "C8800"); err != nil {
+		t.Fatal(err)
+	}
+	edit.Set("title", "赛后改题")
+	if code, body := h.postAs(author, "/problems/P8800", edit); code != http.StatusOK ||
+		!strings.Contains(body, "赛后改题") {
+		t.Fatalf("赛后作者改题 = %d %s", code, short(body))
+	}
+}
+
 func TestContestTimeFormatting(t *testing.T) { // The form and the page must agree on one zone, or a contest starts twice.
 	raw := "2026-01-02T15:04"
 	ms, ok := parseContestTime(raw)

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/liangbinchen2013/fast-oj/internal/store"
@@ -116,6 +117,28 @@ func (s *Server) requireAnyPerm(w http.ResponseWriter, r *http.Request, keys ...
 	}
 	s.respondError(w, r, http.StatusForbidden, "缺少权限："+keys[0])
 	return a, false
+}
+
+// ensureProblemEditable freezes a problem's statement, limits and test data while
+// any contest that mounted it is on the clock. The problem's own author has to
+// wait; the contest host (or contest.manage.any) may still fix an obvious mistake,
+// because otherwise a typo in the data would poison the whole round.
+func (s *Server) ensureProblemEditable(w http.ResponseWriter, r *http.Request, a actor, p store.Problem) bool {
+	running, err := s.db.RunningContestsForProblem(r.Context(), p.ID)
+	if err != nil {
+		s.writeStoreError(w, r, err)
+		return false
+	}
+	for _, c := range running {
+		if a.can(permContestManageAny) || c.OwnerID == a.User.ID {
+			continue
+		}
+		s.respondError(w, r, http.StatusForbidden, fmt.Sprintf(
+			"比赛 %s（%s）正在进行，这道题的题面、时限与用例已冻结；"+
+				"要改请找比赛主办方，或等比赛结束。", c.CID, c.Title))
+		return false
+	}
+	return true
 }
 
 // requireProblemEdit loads a problem and checks authoring rights. Owning it is

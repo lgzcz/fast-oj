@@ -337,6 +337,9 @@ func (s *Server) handleCaseUpload(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if !s.ensureProblemEditable(w, r, a, p) {
+		return
+	}
 	zipBody, ok := s.readUpload(w, r)
 	if !ok {
 		return

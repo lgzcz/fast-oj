@@ -470,6 +470,41 @@ func (db *DB) ListContestProblems(ctx context.Context, contestID int64) ([]Conte
 	return out, rows.Err()
 }
 
+// RunningContest is the slice of a contest the authoring freeze needs.
+type RunningContest struct {
+	ID      int64
+	CID     string
+	Title   string
+	OwnerID int64
+}
+
+// RunningContestsForProblem lists the contests whose clock is running and which
+// have this problem mounted. Authoring uses it to freeze statements, limits and
+// test data: changing them mid-contest moves the target under the participants,
+// and only the host may still do that on purpose.
+func (db *DB) RunningContestsForProblem(ctx context.Context, problemID int64) ([]RunningContest, error) {
+	now := nowMS()
+	rows, err := db.SQL.QueryContext(ctx,
+		`SELECT c.id, c.cid, c.title, c.owner_id
+		   FROM contests c JOIN contest_problems cp ON cp.contest_id=c.id
+		  WHERE cp.problem_id=? AND c.start_at<=? AND c.end_at>?
+		  ORDER BY c.id`, problemID, now, now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []RunningContest
+	for rows.Next() {
+		var c RunningContest
+		if err := rows.Scan(&c.ID, &c.CID, &c.Title, &c.OwnerID); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
 // ContestProblemMounted is what the submit gate checks: a submission may only be
 // attributed to a contest that really carries the problem.
 func (db *DB) ContestProblemMounted(ctx context.Context, contestID, problemID int64) (bool, error) {

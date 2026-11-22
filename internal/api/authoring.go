@@ -348,6 +348,10 @@ func (s *Server) handleProblemUpdate(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// 预览只是渲染，不冻结；真正保存题面/时限/内存时才问比赛。
+	if r.FormValue("preview") != "1" && !s.ensureProblemEditable(w, r, a, p) {
+		return
+	}
 	f, errs := parseProblemForm(r)
 	d, err := s.editDataFor(r, p, false)
 	if err != nil {
@@ -390,6 +394,9 @@ func (s *Server) handleProblemUpdate(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleProblemDelete(w http.ResponseWriter, r *http.Request) {
 	a, p, ok := s.problemForEdit(w, r)
 	if !ok {
+		return
+	}
+	if !s.ensureProblemEditable(w, r, a, p) {
 		return
 	}
 	if err := s.db.DeleteProblem(r.Context(), p.ID); err != nil {

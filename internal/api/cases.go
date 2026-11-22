@@ -273,6 +273,9 @@ func (s *Server) handleJudgeProgram(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if !s.ensureProblemEditable(w, r, a, p) {
+		return
+	}
 	kind := strings.TrimSpace(r.FormValue("kind"))
 	if !store.ValidProgramKind(kind) {
 		s.backToCases(w, r, p, "不认识的判机程序种类："+kind)
@@ -406,6 +409,9 @@ func (s *Server) handleCaseCreate(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if !s.ensureProblemEditable(w, r, a, p) {
+		return
+	}
 	f, bad := parseCaseForm(r)
 	if bad != "" {
 		s.backToCases(w, r, p, bad)
@@ -503,6 +509,9 @@ func (s *Server) handleCaseSave(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if !s.ensureProblemEditable(w, r, a, p) {
+		return
+	}
 	f, bad := parseCaseForm(r)
 	if bad != "" {
 		s.backToCases(w, r, p, bad)
@@ -533,6 +542,9 @@ func (s *Server) handleCaseSave(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleCaseDelete(w http.ResponseWriter, r *http.Request) {
 	a, p, tc, ok := s.caseForEdit(w, r)
 	if !ok {
+		return
+	}
+	if !s.ensureProblemEditable(w, r, a, p) {
 		return
 	}
 	if _, err := s.db.DeleteTestcase(r.Context(), tc.ID); err != nil {
@@ -570,6 +582,9 @@ func (s *Server) handleCaseDelete(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleCaseWipe(w http.ResponseWriter, r *http.Request) {
 	a, p, ok := s.requireCaseAccess(w, r, r.PathValue("key"))
 	if !ok {
+		return
+	}
+	if !s.ensureProblemEditable(w, r, a, p) {
 		return
 	}
 	n, err := s.db.DeleteTestcases(r.Context(), p.ID)
@@ -664,6 +679,10 @@ func (s *Server) handleCasesBatch(w http.ResponseWriter, r *http.Request) {
 	meta := make([]store.TestcaseMeta, 0, len(rows))
 	for _, row := range rows {
 		meta = append(meta, store.TestcaseMeta{ID: row.ID, Score: row.Score, GroupName: row.Group, IsSample: row.IsSample})
+	}
+	// 上面的 split/group 只是把表填好，真正落库在这里；冻结只挡落库这一步。
+	if !s.ensureProblemEditable(w, r, a, p) {
+		return
 	}
 	if err := s.db.UpdateTestcaseMeta(r.Context(), p.ID, meta); err != nil {
 		s.renderCases(w, r, a, p, rows, "批量修改没有保存："+err.Error())
