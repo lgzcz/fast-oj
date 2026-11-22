@@ -1,0 +1,40 @@
+{{define "content"}}
+<h1>查重</h1>
+<p class="meta">只比较同一道题、同一语言、已 AC 的提交；按规范化后的 4-token 窗口算相似度。
+  结果只供人工复核，<b>不会自动扣分或封号</b>。</p>
+
+<form class="row" method="get" action="/admin/plagiarism">
+  <div style="flex:1 1 18rem">
+    <label for="plag-problem">题目编号</label>
+    <input id="plag-problem" type="text" name="problem" value="{{.Data.Query}}"
+           maxlength="32" autocomplete="off" spellcheck="false" placeholder="如 P1001" required>
+  </div>
+  <div><label>&nbsp;</label><input type="submit" value="查这道题"></div>
+</form>
+
+{{if .Data.Problem}}
+<p class="meta">题目 <a href="/problems/{{.Data.Problem}}">{{.Data.Problem}}</a> {{.Data.ProblemName}}
+  · 已 AC 提交 {{.Data.Checked}} 条 · 太短没比较 {{.Data.TooShort}} 条
+  · 相似度 ≥ {{.Data.Percent}}% 的对子 {{len .Data.Pairs}} 个（最多列 100 个）</p>
+
+<div class="table-scroll" role="region" aria-label="查重结果" tabindex="0">
+<table>
+  <tr><th class="num">相似度</th><th>甲</th><th>乙</th><th>语言</th><th>时间</th></tr>
+  {{range .Data.Pairs}}
+  <tr>
+    <td class="num"><b>{{.Similarity}}%</b></td>
+    <td><a href="/u/{{.AHandle}}">{{.AName}}</a> · <a href="/submissions/{{.AID}}">#{{.AID}}</a></td>
+    <td><a href="/u/{{.BHandle}}">{{.BName}}</a> · <a href="/submissions/{{.BID}}">#{{.BID}}</a></td>
+    <td>{{.Language}}</td>
+    <td>{{.AWhen}} / {{.BWhen}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="5">没有达到阈值的对子。</td></tr>
+  {{end}}
+</table>
+</div>
+
+<p class="meta">误伤从哪来：模板代码、同一份讲义里的公共骨架（快读、并查集）都会天然相似。
+  重命名变量、改写循环结构会让分数明显下降；分数高不等于抄，先看两份源码与提交时间。</p>
+{{end}}
+{{end}}

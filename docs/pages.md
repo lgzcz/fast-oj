@@ -108,6 +108,7 @@
 | `POST` | `/judge/submissions/{id}/status` | 判机令牌 | 进度 + 逐用例回报（`compiling` → `running`） |
 | `POST` | `/judge/submissions/{id}/result` | 判机令牌 | 终局判定与逐用例结果 |
 | `GET` | `/judges` | `judge.view` | 判机清单：能判的语言、**此刻有没有牢房**、自报能力、最近心跳、备注；没有一台有牢房时页面顶部当面警告 |
+| `GET` | `/admin/plagiarism` | `submission.view.any` | 同题同语言已 AC 提交的相似度报告（`?problem=PID`）；只报告，不自动处罚 |
 | `GET` `/POST` | `/admin/site` | `site.settings` | 上半页是运行状态（磁盘各部分、评测队列、评测机），下半页是设置：站名、首页语、友情链接、页脚、API 提示、六个功能开关、提交速率两道闸、发信（SMTP）配置 |
 | `POST` | `/admin/site/test-email` | `site.settings` | 按表单里刚填的值发一封测试邮件，失败原因原样显示在这一页 |
 | `GET` | `/admin/perms` | `permission.manage` 或 `user.manage` | 账号列表（带积分那一列）与权限控制台 |

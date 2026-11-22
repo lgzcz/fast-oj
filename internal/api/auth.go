@@ -322,6 +322,7 @@ func (a actor) viewer() *viewer {
 		Unread:   a.Unread, Notices: a.Notices, Tickets: a.Tickets, CSRF: a.Session.CSRF,
 		HandleTickets: a.can(permTicketHandle),
 		Stats:         a.can(permStatsView),
+		Plagiarism:    a.can(permSubmissionViewAny),
 		IPs:           a.can(permIPManage),
 		Audit:         a.can(permIPManage),
 		// 配色不查第二遍：它已经在 authenticate 读出的那一行 users 里，这里只是把那串文本

@@ -296,6 +296,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /admin/accounts/new", s.handleAccountsNew)
 	mux.HandleFunc("POST /admin/accounts", s.handleAccountsCreate)
 	mux.HandleFunc("GET /admin/stats", s.handleStats)
+	mux.HandleFunc("GET /admin/plagiarism", s.handlePlagiarism)
 	// IP 封禁与按地址流量：来源全是 127.0.0.1 时这一页会自动收起（见 ipFeatureOn）。
 	mux.HandleFunc("GET /admin/ips", s.handleIPs)
 	mux.HandleFunc("POST /admin/ips/ban", s.handleIPBanAdd)
