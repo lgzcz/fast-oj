@@ -105,6 +105,23 @@ func TestJudgeRoutesAreNotBufferedForGzip(t *testing.T) {
 	}
 }
 
+// 正常页与错误页都带这三项：它们是 Markdown 过滤之外的第二道闸。
+func TestSecurityHeadersOnEveryResponse(t *testing.T) {
+	h := newHarness(t)
+	for _, path := range []string{"/problems", "/no-such-page"} {
+		_, _, hdr := h.html(http.MethodGet, path, "", nil, "")
+		if got := hdr.Get("X-Content-Type-Options"); got != "nosniff" {
+			t.Errorf("%s: X-Content-Type-Options = %q", path, got)
+		}
+		if got := hdr.Get("X-Frame-Options"); got != "DENY" {
+			t.Errorf("%s: X-Frame-Options = %q", path, got)
+		}
+		if got := hdr.Get("Referrer-Policy"); got != "same-origin" {
+			t.Errorf("%s: Referrer-Policy = %q", path, got)
+		}
+	}
+}
+
 func TestStaticAssetsAreVersionedAndCachedForever(t *testing.T) {
 	h := newHarness(t)
 

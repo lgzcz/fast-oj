@@ -405,9 +405,18 @@ func (s *Server) logRequests(next http.Handler) http.Handler {
 }
 
 // wrap orders the chain: log first so a rejected request is still recorded,
-// then the CSRF gate, then the handler.
+// then the CSRF gate, then the handler. The security headers are set here, on
+// the same outermost layer, so an error page and a static file get them too.
 func (s *Server) wrap(next http.Handler) http.Handler {
 	// guardIP 在最外层：一个被 IP 挡掉的请求仍然要进日志和流量统计，
 	// 管理员正是因为看见那一大片被拒的请求才会去封。
-	return gzipResponses(s.logRequests(s.guardIP(s.cacheActor(s.guardCSRF(next)))))
+	h := gzipResponses(s.logRequests(s.guardIP(s.cacheActor(s.guardCSRF(next)))))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Markdown 已经过滤 HTML 与危险协议，这三项是第二道闸：不许浏览器猜类型、
+		// 不许别的站点把页面框进去、跨站跳转时不带完整来源。
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "same-origin")
+		h.ServeHTTP(w, r)
+	})
 }
