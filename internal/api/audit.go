@@ -26,6 +26,40 @@ import (
 // moment for, but holding a database connection past the response is not.
 const auditTimeout = 3 * time.Second
 
+const (
+	// 判机协议的错误凭据是公开可打的：带一个错的 Bearer 去 /judge/claim，每一下都会
+	// 想往审计表里写一行。上限按 IP 每小时计，超出只进 stderr——真正的判机配错令牌时
+	// 也会被这条挡住，所以日志里的告警仍然要逐条留着。
+	deniedAuditWindow      = time.Hour
+	maxJudgeDeniedPerIP    = 60
+	maxTokenDeniedPerIP    = 60
+	maxTokenThrottledPerIP = 5
+)
+
+// auditBudgeted reports whether an attacker-driven audit line may be written now.
+// Wrong credentials are the one audit source a stranger controls; without a budget
+// every request becomes a row and the trail itself becomes the way to fill the disk.
+// The fact still reaches stderr either way.
+func (s *Server) auditBudgeted(ctx context.Context, ip, action string, max int) bool {
+	if ip == "" {
+		return true
+	}
+	key := "audit:" + action + ":" + ip
+	allowed, err := s.db.LoginAllowed(ctx, key, deniedAuditWindow, max)
+	if err != nil {
+		// 读不出限流时宁可多写几行，也不能让一次数据库抖动把线索吞掉。
+		s.log.Error("audit throttle failed", "action", action, "err", err)
+		return true
+	}
+	if !allowed {
+		return false
+	}
+	if _, err := s.db.RegisterLoginFailure(ctx, key, deniedAuditWindow); err != nil {
+		s.log.Error("audit throttle count failed", "action", action, "err", err)
+	}
+	return true
+}
+
 // audit appends one trail line for the acting identity.
 //
 // A failure here is logged and dropped: the action it describes has already changed
@@ -85,12 +119,20 @@ func (s *Server) auditJudge(box, action, target, detail string) {
 // 而它今天只混在通用请求日志里（只有方法、路径、状态码）。这里只记判机协议那一路：
 // 网页上的 401 是普通访客没登录，量大且没有特权动作发生，记下来只会把真正的那几条冲淡。
 func (s *Server) auditDenied(r *http.Request, reason string) {
+	ip := clientIP(r)
+	// 先问再记，顺序与别处的限流一致：被挡下的那一次不再续窗口。计数表本身只有
+	// 一个 IP 一行，审计表才是会长的那张。
+	if !s.auditBudgeted(r.Context(), ip, "judge.denied", maxJudgeDeniedPerIP) {
+		s.log.Warn("judge credential denied (audit row throttled)",
+			"ip", ip, "path", r.URL.Path, "reason", reason)
+		return
+	}
 	e := store.AuditEvent{
 		Action: "judge.denied",
 		Actor:  credentialKind(r),
 		Target: r.URL.Path,
 		Detail: reason,
-		IP:     clientIP(r),
+		IP:     ip,
 	}
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), auditTimeout)
 	defer cancel()

@@ -30,6 +30,47 @@ func (h *harness) auditRows(action string) []store.AuditRow {
 	return rows
 }
 
+// 判机协议的错误凭据是公开可打的：审计要留线索，但不能变成"每敲一次门写一行"。
+// 三个由陌生人控制的动作各自按 IP 限流；换一个 IP 照常记。
+func TestJudgeDeniedAuditIsThrottledPerIP(t *testing.T) {
+	h := newHarness(t)
+	const noisy, quiet = "198.51.100.77", "198.51.100.78"
+	h.openSite(noisy)
+
+	for i := 0; i < 200; i++ {
+		code, _ := h.from(http.MethodPost, "/judge/claim", noisy+":4000", "wrong-token", url.Values{})
+		// 试错够 claimAttempts 次之后，闸门改回 403；两种都是被拒。
+		if code != http.StatusUnauthorized && code != http.StatusForbidden {
+			t.Fatalf("错误令牌 = %d", code)
+		}
+	}
+	want := map[string]int{
+		"judge.denied":          maxJudgeDeniedPerIP,
+		"admin.token.denied":    maxTokenDeniedPerIP,
+		"admin.token.throttled": maxTokenThrottledPerIP,
+	}
+	for action, max := range want {
+		n, err := h.db.CountAudit(context.Background(), store.AuditFilter{Action: action})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n != max {
+			t.Errorf("%s = %d, want %d", action, n, max)
+		}
+	}
+
+	h.openSite(quiet)
+	if code, _ := h.from(http.MethodPost, "/judge/claim", quiet+":4000", "wrong-token", url.Values{}); code != http.StatusUnauthorized {
+		t.Fatalf("另一个 IP 的错误令牌 = %d", code)
+	}
+	for action, want := range map[string]int{"judge.denied": 61, "admin.token.denied": 61} {
+		n, err := h.db.CountAudit(context.Background(), store.AuditFilter{Action: action})
+		if err != nil || n != want {
+			t.Errorf("另一个 IP 也应留下自己的一行：%s n=%d err=%v", action, n, err)
+		}
+	}
+}
+
 func TestAuditPermissionGrant(t *testing.T) {
 	h := newHarness(t)
 	h.author("auditee")

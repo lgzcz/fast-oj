@@ -62,7 +62,11 @@ func (s *Server) settleAdminToken(r *http.Request, status int) {
 			s.log.Error("throttle", "err", err)
 		}
 		s.log.Warn("operator token refused", "ip", clientIP(r), "path", r.URL.Path)
-		s.audit(r, actor{}, "admin.token.denied", r.Method+" "+r.URL.Path, "运维令牌不正确或已经用过（来自 "+clientIP(r)+"）")
+		if s.auditBudgeted(ctx, clientIP(r), "admin.token.denied", maxTokenDeniedPerIP) {
+			s.audit(r, actor{}, "admin.token.denied", r.Method+" "+r.URL.Path, "运维令牌不正确或已经用过（来自 "+clientIP(r)+"）")
+		} else {
+			s.log.Warn("operator token refused: audit row throttled", "ip", clientIP(r), "path", r.URL.Path)
+		}
 		return
 	}
 	if status >= 400 {
@@ -101,8 +105,12 @@ func (s *Server) adminTokenOverBudget(r *http.Request) bool {
 		return false
 	}
 	s.log.Warn("operator token refused: too many failures", "ip", clientIP(r), "path", r.URL.Path)
-	s.audit(r, actor{}, "admin.token.throttled", r.Method+" "+r.URL.Path,
-		clientIP(r)+" 在 15 分钟内试得太多")
+	if s.auditBudgeted(r.Context(), clientIP(r), "admin.token.throttled", maxTokenThrottledPerIP) {
+		s.audit(r, actor{}, "admin.token.throttled", r.Method+" "+r.URL.Path,
+			clientIP(r)+" 在 15 分钟内试得太多")
+	} else {
+		s.log.Warn("operator token refused: audit row throttled", "ip", clientIP(r), "path", r.URL.Path)
+	}
 	return true
 }
 
