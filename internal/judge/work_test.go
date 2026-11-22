@@ -226,6 +226,31 @@ func TestJudgeRefusesRunawayMemory(t *testing.T) {
 	}
 }
 
+// stderr 是程序自己的输出：读 stdin 再写 stderr 就能把隐藏输入带进详情页。
+// RE/MLE 必须用信号/退出码与限额说明代替，只有判机自己说不出原因的失败才退回 stderr。
+func TestFailureDetailDoesNotLeakStderrForReAndMle(t *testing.T) {
+	secret := "hidden input 42\n"
+	re := Execution{Verdict: RE, Exit: -1, Stderr: []byte(secret), Note: "signal: segmentation fault"}
+	if got := failureDetail(RE, "", re); strings.Contains(got, "hidden input") || !strings.Contains(got, "signal") {
+		t.Errorf("RE detail = %q", got)
+	}
+	if got := failureDetail(RE, "", Execution{Verdict: RE, Exit: 7, Stderr: []byte(secret)}); strings.Contains(got, "hidden input") ||
+		!strings.Contains(got, "7") {
+		t.Errorf("RE without a note = %q", got)
+	}
+	if got := failureDetail(MLE, "", Execution{Verdict: MLE, Stderr: []byte(secret)}); got == "" ||
+		strings.Contains(got, "hidden input") {
+		t.Errorf("MLE detail = %q", got)
+	}
+	// WA 的 diff、SPJ/交互器的评语仍然优先；IE 这类判机自己没话说的失败才用 stderr。
+	if got := failureDetail(WA, "line 1: got [1] want [2]", re); !strings.Contains(got, "line 1") {
+		t.Errorf("WA note lost: %q", got)
+	}
+	if got := failureDetail(IE, "", Execution{Verdict: IE, Stderr: []byte("boom")}); got != "boom" {
+		t.Errorf("IE detail = %q", got)
+	}
+}
+
 func TestJudgeWithoutCasesIsInfrastructureError(t *testing.T) {
 	tool := requireToolchain(t)
 	rep := judgeSource(t, tool, sumSource, nil, 1000, 65536)

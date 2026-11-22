@@ -256,16 +256,7 @@ func Judge(task Task, tool Tool, dir string, drop *DropTo, onProgress Progress) 
 		if firstFailure < 0 {
 			firstFailure = len(rep.Runs) - 1
 			rep.FailedCase = tc.Name
-			detail := note
-			if detail == "" {
-				detail = strings.TrimSpace(string(ex.Stderr))
-			}
-			if detail == "" {
-				// 一个跑都没跑起来的失败（可执行文件不在、沙盒没建起来、fork 被拒）不会
-				// 留下任何 stderr，原因只在 Note 里。丢掉它就是又一条查不出来的 IE。
-				detail = strings.TrimSpace(ex.Note)
-			}
-			rep.Detail = clipText(detail, maxDetail)
+			rep.Detail = clipText(failureDetail(v, note, ex), maxDetail)
 		}
 		if severity(v) > severity(worst) {
 			worst = v
@@ -286,6 +277,27 @@ func Judge(task Task, tool Tool, dir string, drop *DropTo, onProgress Progress) 
 		rep.Verdict = worst
 	}
 	return rep
+}
+
+// failureDetail is what the first failing case gets to say. stderr is the program's
+// own output and may contain the hidden input it just read, so it is used only for
+// failures the judge could not otherwise explain. RE and MLE always get a note
+// built from the signal/exit code or the limit instead — a contestant must not be
+// able to print stdin to stderr and read the test data back on the detail page.
+func failureDetail(v Verdict, note string, ex Execution) string {
+	if note != "" {
+		return note
+	}
+	if n := strings.TrimSpace(ex.Note); n != "" {
+		return n
+	}
+	switch v {
+	case RE:
+		return "程序异常退出（退出码 " + strconv.Itoa(ex.Exit) + "）"
+	case MLE:
+		return "内存超限"
+	}
+	return strings.TrimSpace(string(ex.Stderr))
 }
 
 // severity orders verdicts so the most informative one wins when several cases
